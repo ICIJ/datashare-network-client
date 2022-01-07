@@ -5,8 +5,13 @@ name = "pypi"
 
 [packages]
 datashare-network-core = '*'
+aiohttp = '*'
 
 [dev-packages]
+datashare-network-server = {path = "./../datashare-network-server/dist/datashare-network-server-0.1.0.tar.gz"}
+uvicorn = {extras = ["standard"], version = "*"}
+pytest = '*'
+pytest-asyncio = '*'
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
 twine = "==3.2.0"
