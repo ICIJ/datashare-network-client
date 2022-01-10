@@ -4,14 +4,9 @@ from yarl import URL
 from dsnetclient.api import DsnetApi
 from test.server import UvicornTestServer
 
-server = None
-
 
 @pytest.fixture
 async def startup_and_shutdown_server():
-    global server
-
-    """Start server as test fixture and tear down after test"""
     server = UvicornTestServer('dsnetserver.main:app')
     await server.up()
     yield
