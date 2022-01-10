@@ -620,7 +620,7 @@
         },
         "datashare-network-server": {
             "hashes": [
-                "sha256:6d4b83ea8deef6d7548cbedbd142901e5bb1de529210208c415364ad2fcab5dc"
+                "sha256:5ce1a28cc30ed1732ad3fe92148354d3da6f30907e926f7dd95d51c6991f048b"
             ],
             "path": "./../datashare-network-server/dist/datashare-network-server-0.1.0.tar.gz",
             "version": "==0.1.0"
@@ -849,10 +849,11 @@
         },
         "rfc3986": {
             "hashes": [
-                "sha256:270aaf10d87d0d4e095063c65bf3ddbc6ee3d0b226328ce21e036f946e421835",
-                "sha256:a86d6e1f5b1dc238b218b012df0aa79409667bb209e58da56d0b94704e712a97"
+                "sha256:50b1502b60e289cb37883f3dfd34532b8873c7de9f49bb546641ce9cbd256ebd",
+                "sha256:97aacf9dbd4bfd829baad6e6309fa6573aaf1be3f6fa735c8ab05e46cecb261c"
             ],
-            "version": "==1.5.0"
+            "markers": "python_version >= '3.7'",
+            "version": "==2.0.0"
         },
         "secretstorage": {
             "hashes": [
