@@ -34,3 +34,16 @@ async def test_save_pigeonhole(connect_disconnect_db):
     assert actual_ph.public_key == ph.public_key
     assert actual_ph.message_number == ph.message_number
     assert actual_ph.sym_key == ph.sym_key
+
+
+@pytest.mark.asyncio
+async def test_delete_pigeonhole(connect_disconnect_db):
+    bob_keys = gen_key_pair()
+    alice_keys = gen_key_pair()
+    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    repository = SqlalchemyRepository(database)
+
+    assert await repository.save_pigeonhole(ph, 123) is True
+
+    assert await repository.delete_pigeonhole(ph.address) is True
+    assert await repository.get_pigeonhole(ph.address) is None
