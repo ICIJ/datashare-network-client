@@ -1,10 +1,8 @@
 import abc
-import logging
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
 from sqlalchemy import insert
-from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from dsnetclient.models import pigeonhole_table
 

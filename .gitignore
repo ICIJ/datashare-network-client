@@ -13,4 +13,4 @@ tmp
 ./*.csv
 .vscode
 
-*/**/*.db
+**/*.db
