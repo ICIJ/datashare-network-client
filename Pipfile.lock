@@ -209,11 +209,11 @@
         },
         "datashare-network-core": {
             "hashes": [
-                "sha256:b985b6a53e6db9b7befaec679a9787cdd6ff1a141ef646631b5bcc99d879d9da",
-                "sha256:d9325ea873bffdfd8cb12f42fdecefdbf0f94489ee071ec2b7eb1fa214ef2a1b"
+                "sha256:0848bec27fc26654a9c46a47f44bfef5576dfad230dac42f0f695082679a802b",
+                "sha256:9ae61276e469e133463ed44bc820c553195f9920274512af7a67f644f2c29018"
             ],
             "index": "pypi",
-            "version": "==0.1.1"
+            "version": "==0.1.2"
         },
         "frozenlist": {
             "hashes": [
