@@ -1,8 +1,10 @@
 import abc
+import logging
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
 from sqlalchemy import insert
+from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from dsnetclient.models import pigeonhole_table
 
@@ -27,7 +29,7 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def save_pigeonhole(self, pigeon_hole: PigeonHole, conversation_id: int) -> bool:
+    async def save_pigeonhole(self, pigeon_hole: PigeonHole, conversation_id: int) -> None:
         """
         Save a pigeonhole based on a conversation id.
 
@@ -57,13 +59,12 @@ class SqlalchemyRepository(Repository):
                           message_number=row['message_number'],
                           dh_key=row['dh_key']) if row is not None else None
 
-    async def save_pigeonhole(self, pigeonhole: PigeonHole, conversation_id: int) -> bool:
-        stmt = insert(pigeonhole_table).values(address=pigeonhole.address,
-                                               dh_key=pigeonhole.dh_key,
-                                               public_key=pigeonhole.public_key,
-                                               message_number=pigeonhole.message_number,
-                                               conversation_id=conversation_id)
-        return await self.database.execute(stmt) > 0
+    async def save_pigeonhole(self, pigeonhole: PigeonHole, conversation_id: int) -> None:
+        await self.database.execute(insert(pigeonhole_table).values(address=pigeonhole.address,
+                                                                    dh_key=pigeonhole.dh_key,
+                                                                    public_key=pigeonhole.public_key,
+                                                                    message_number=pigeonhole.message_number,
+                                                                    conversation_id=conversation_id))
 
     async def delete_pigeonhole(self, address: bytes) -> bool:
         return await self.database.execute(pigeonhole_table.delete().where(pigeonhole_table.c.address == address)) > 0

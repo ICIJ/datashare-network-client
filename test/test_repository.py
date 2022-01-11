@@ -1,3 +1,5 @@
+from sqlite3 import IntegrityError
+
 import databases
 import pytest
 from dsnet.core import PigeonHole
@@ -13,9 +15,11 @@ database = databases.Database(DATABASE_URL)
 
 @pytest.fixture
 async def connect_disconnect_db():
-    metadata.create_all(create_engine(DATABASE_URL))
+    engine = create_engine(DATABASE_URL)
+    metadata.create_all(engine)
     await database.connect()
     yield
+    metadata.drop_all(engine)
     await database.disconnect()
 
 
@@ -26,7 +30,7 @@ async def test_save_pigeonhole(connect_disconnect_db):
     ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
-    assert await repository.save_pigeonhole(ph, 123) is True
+    await repository.save_pigeonhole(ph, 123)
     actual_ph = await repository.get_pigeonhole(ph.address)
 
     assert actual_ph is not None
@@ -37,13 +41,24 @@ async def test_save_pigeonhole(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_pigeonhole(connect_disconnect_db):
+async def test_save_pigeonhole_twice(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
     ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
-    assert await repository.save_pigeonhole(ph, 123) is True
+    await repository.save_pigeonhole(ph, 123)
+    with pytest.raises(IntegrityError):
+        await repository.save_pigeonhole(ph, 123)
+
+
+@pytest.mark.asyncio
+async def test_delete_pigeonhole(connect_disconnect_db):
+    bob_keys = gen_key_pair()
+    alice_keys = gen_key_pair()
+    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    repository = SqlalchemyRepository(database)
+    await repository.save_pigeonhole(ph, 123)
 
     assert await repository.delete_pigeonhole(ph.address) is True
     assert await repository.get_pigeonhole(ph.address) is None
