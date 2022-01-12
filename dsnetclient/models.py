@@ -21,10 +21,11 @@ message_table = Table(
     "message",
     metadata,
     Column("id", Integer, primary_key=True),
+    Column("address", LargeBinary),
     Column('timestamp', DateTime, nullable=False),
     Column('message_number', Integer, nullable=False),
     Column("from_key", LargeBinary, index=True, nullable=False),
-    Column("content", Text, nullable=False),
+    Column("payload", Text, nullable=False),
     Column("conversation_id", Integer, ForeignKey('conversation.id')),
 )
 

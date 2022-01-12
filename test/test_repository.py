@@ -2,7 +2,7 @@ from sqlite3 import IntegrityError
 
 import databases
 import pytest
-from dsnet.core import PigeonHole, Conversation
+from dsnet.core import PigeonHole, Conversation, Message
 from dsnet.crypto import gen_key_pair
 from sqlalchemy import create_engine
 
@@ -64,11 +64,44 @@ async def test_delete_pigeonhole(connect_disconnect_db):
     assert await repository.get_pigeonhole(ph.address) is None
 
 
-async def test_save_conversation(connect_disconnect_db):
+@pytest.mark.asyncio
+async def test_save_conversation_with_a_query(connect_disconnect_db):
     query_keys = gen_key_pair()
     bob_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, bob_keys.public, querier=True)
+    conversation = Conversation(query_keys.private, bob_keys.public, query='France', querier=True)
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
+    actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
+
+    assert actual_conversation is not None
+    assert actual_conversation.private_key == conversation.private_key
+    assert actual_conversation.public_key == conversation.public_key
+    assert actual_conversation.other_public_key == conversation.other_public_key
+    assert actual_conversation.querier == conversation.querier
+    assert actual_conversation.query == conversation.query
+    assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
+    assert actual_conversation.nb_recv_messages == conversation.nb_recv_messages
+    assert actual_conversation.is_receiving(conversation.last_address) == True
+    assert await repository.get_pigeonhole(actual_conversation.last_address) is not None
+
+
+@pytest.mark.asyncio
+async def test_save_conversation_with_messages(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+
+    query_keys = gen_key_pair()
+    alicia_keys = gen_key_pair()
+    conversation = Conversation(query_keys.private, alicia_keys.public, query='Pop', querier=True)
+    ph = conversation.pigeonhole_for_address(conversation.last_address)
+    encrypted_message1 = ph.encrypt('alicia response1')
+    conversation.add_message(Message(conversation.last_address, encrypted_message1, alicia_keys.public))
+    ph = conversation.pigeonhole_for_address(conversation.last_address)
+    encrypted_message2 = ph.encrypt('alicia response2')
+    conversation.add_message(Message(conversation.last_address, encrypted_message2, alicia_keys.public))
+
+    await repository.save_conversation(conversation)
+
+    actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
+    assert len(actual_conversation._messages) == 2
