@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey
+from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text
 
 # Database table definitions.
 metadata = MetaData()
@@ -9,6 +9,18 @@ conversation_table = Table(
     Column("id", Integer, primary_key=True),
     Column("private_key", LargeBinary, nullable=False),
     Column("public_key", LargeBinary, index=True, nullable=False),
+    Column('created_at', DateTime, nullable=False),
+)
+
+message_table = Table(
+    "message",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column('timestamp', DateTime, nullable=False),
+    Column('message_number', Integer, nullable=False),
+    Column("from_key", LargeBinary, index=True, nullable=False),
+    Column("content", Text, nullable=False),
+    Column("conversation_id", Integer, ForeignKey('conversation.id')),
 )
 
 pigeonhole_table = Table(
