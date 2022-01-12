@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text
+from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text, Boolean
 
 # Database table definitions.
 metadata = MetaData()
@@ -9,6 +9,11 @@ conversation_table = Table(
     Column("id", Integer, primary_key=True),
     Column("private_key", LargeBinary, nullable=False),
     Column("public_key", LargeBinary, index=True, nullable=False),
+    Column("other_public_key", LargeBinary, index=True, nullable=False),
+    Column('nb_sent_messages', Integer, nullable=False),
+    Column('nb_recv_messages', Integer, nullable=False),
+    Column('querier', Boolean, nullable=False, default=False),
+    Column('query', Text, nullable=False),
     Column('created_at', DateTime, nullable=False),
 )
 

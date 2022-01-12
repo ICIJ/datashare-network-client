@@ -8,6 +8,7 @@ datashare-network-core = '*'
 aiohttp = '*'
 
 [dev-packages]
+alembic = "*"
 datashare-network-server = {path = "./../datashare-network-server/dist/datashare-network-server-0.1.0.tar.gz"}
 uvicorn = {extras = ["standard"], version = "*"}
 pytest = '*'

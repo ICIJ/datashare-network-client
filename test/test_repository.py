@@ -2,7 +2,7 @@ from sqlite3 import IntegrityError
 
 import databases
 import pytest
-from dsnet.core import PigeonHole
+from dsnet.core import PigeonHole, Conversation
 from dsnet.crypto import gen_key_pair
 from sqlalchemy import create_engine
 
@@ -62,3 +62,13 @@ async def test_delete_pigeonhole(connect_disconnect_db):
 
     assert await repository.delete_pigeonhole(ph.address) is True
     assert await repository.get_pigeonhole(ph.address) is None
+
+
+async def test_save_conversation(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    bob_keys = gen_key_pair()
+
+    conversation = Conversation(query_keys.private, bob_keys.public, querier=True)
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(conversation)
