@@ -105,3 +105,16 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
 
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
     assert len(actual_conversation._messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_conversation_by_address(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+
+    conversation = Conversation(query_keys.private, carol_keys.public, query='France', querier=True)
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(conversation)
+
+    assert await repository.get_conversation_by_address(conversation.last_address) is not None

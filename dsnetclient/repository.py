@@ -3,7 +3,7 @@ from datetime import datetime
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole, Message
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table
 
@@ -12,9 +12,18 @@ class Repository(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def get_conversation_by_key(self, conversation_pub_key: bytes) -> Conversation:
         """
-        Saves a response address to a query.
+        Gets a conversation by its public key
 
         :param conversation_pub_key: Conversation public key to retrieve
+        :return: Retrieved conversation
+        """
+
+    @abc.abstractmethod
+    async def get_conversation_by_address(self, address: bytes) -> Conversation:
+        """
+        Gets a conversation by ph address
+
+        :param address: last pigeon hole address linked to conversation
         :return: Retrieved conversation
         """
 
@@ -104,8 +113,16 @@ class SqlalchemyRepository(Repository):
         await self.database.execute(stmt)
 
     async def get_conversation_by_key(self, public_key) -> Conversation:
-        stmt = conversation_table.select().where(conversation_table.c.public_key == public_key)
-        row = await self.database.fetch_one(stmt)
+        return await self._get_conversation(conversation_table.select().where(conversation_table.c.public_key == public_key))
+
+    async def get_conversation_by_address(self, address):
+        stmt = select(pigeonhole_table.c.conversation_id).where(pigeonhole_table.c.address == address)
+        conversation_id, = await self.database.fetch_one(stmt)
+        return await self._get_conversation(conversation_table.select().where(conversation_table.c.id == conversation_id))
+
+    async def _get_conversation(self, statement) -> Conversation:
+        row = await self.database.fetch_one(statement)
+
         phs = [
             PigeonHole(public_key_for_dh=row['public_key'], message_number=row['message_number'], dh_key=row['dh_key'])
             for row in await self.database.fetch_all(
@@ -115,4 +132,5 @@ class SqlalchemyRepository(Repository):
                 for row in await self.database.fetch_all(
                 message_table.select().where(message_table.c.conversation_id == row['id']))]
 
-        return Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'], pigeonholes=phs, messages=msgs)
+        return Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'], pigeonholes=phs,
+                            messages=msgs)
