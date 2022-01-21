@@ -7,7 +7,7 @@ from dsnet.crypto import gen_key_pair
 from sqlalchemy import create_engine
 
 from dsnetclient.models import metadata
-from dsnetclient.repository import SqlalchemyRepository
+from dsnetclient.repository import SqlalchemyRepository, Peer
 
 DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
@@ -118,3 +118,28 @@ async def test_get_conversation_by_address(connect_disconnect_db):
     await repository.save_conversation(conversation)
 
     assert await repository.get_conversation_by_address(conversation.last_address) is not None
+
+
+@pytest.mark.asyncio
+async def test_get_conversations(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+
+    conversation = Conversation(query_keys.private, carol_keys.public, query='Hello', querier=True)
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(conversation)
+
+    assert len(await repository.get_conversations()) == 1
+    assert (await repository.get_conversations())[0].query == 'Hello'
+
+
+@pytest.mark.asyncio
+async def test_save_get_peers(connect_disconnect_db):
+    peer_keys = gen_key_pair()
+    repository = SqlalchemyRepository(database)
+    await repository.save_peer(Peer(peer_keys.public))
+
+    actual_peers = await repository.peers()
+    assert len(actual_peers) == 1
+    assert actual_peers[0].public_key == peer_keys.public

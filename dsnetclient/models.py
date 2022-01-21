@@ -3,6 +3,15 @@ from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey
 # Database table definitions.
 metadata = MetaData()
 
+
+peer_table = Table(
+    "peer",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("public_key", LargeBinary, index=True, nullable=False)
+)
+
+
 conversation_table = Table(
     "conversation",
     metadata,

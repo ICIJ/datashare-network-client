@@ -1,11 +1,18 @@
 import abc
 from datetime import datetime
+from typing import List
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole, Message
 from sqlalchemy import insert, select
 
-from dsnetclient.models import pigeonhole_table, conversation_table, message_table
+from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table
+
+
+class Peer:
+    def __init__(self, public_key: bytes, id=None):
+        self.id = id
+        self.public_key = public_key
 
 
 class Repository(metaclass=abc.ABCMeta):
@@ -62,6 +69,28 @@ class Repository(metaclass=abc.ABCMeta):
 
         :param address: pigeonhole address
         :return: pigeonhole object
+        """
+
+    @abc.abstractmethod
+    async def get_conversations(self) -> List[Conversation]:
+        """
+        Get database conversation list
+
+        :return: list of conversation objects
+        """
+
+    @abc.abstractmethod
+    async def peers(self) -> List[Peer]:
+        """
+        Get peers list
+
+        :return: list of peers
+        """
+
+    @abc.abstractmethod
+    async def save_peer(self, peer: Peer) -> None:
+        """
+        Save peer
         """
 
 
@@ -134,3 +163,19 @@ class SqlalchemyRepository(Repository):
 
         return Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'], pigeonholes=phs,
                             messages=msgs)
+
+    async def get_conversations(self) -> List[Conversation]:
+        stmt = conversation_table.select().join(pigeonhole_table,
+                                                conversation_table.c.id == pigeonhole_table.c.conversation_id).join(
+            message_table, conversation_table.c.id == message_table.c.conversation_id, isouter=True)
+        all_ = await self.database.fetch_all(stmt)
+        return all_ # TODO: map to Conversation objects
+
+
+    async def peers(self) -> List[Peer]:
+        stmt = peer_table.select()
+        return [Peer(**peer) for peer in await self.database.fetch_all(stmt)]
+
+
+    async def save_peer(self, peer: Peer):
+        await self.database.execute(insert(peer_table).values(public_key=peer.public_key))

@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = '*'
+datashare-network-core = '==0.1.4'
 aiohttp = '*'
 
 [dev-packages]

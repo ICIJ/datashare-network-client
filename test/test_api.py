@@ -1,13 +1,30 @@
 import databases
 import pytest
+from dsnet.crypto import gen_key_pair
+from sqlalchemy import create_engine
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
-from dsnetclient.repository import SqlalchemyRepository
+from dsnetclient.models import metadata as metadata_client
+from dsnetserver.models import metadata as metadata_server
+from dsnetclient.repository import SqlalchemyRepository, Peer
 from test.server import UvicornTestServer
 
 DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
+
+
+@pytest.fixture
+async def connect_disconnect_db():
+    engine = create_engine(DATABASE_URL)
+    metadata_client.create_all(engine)
+    metadata_server.create_all(engine)
+    await database.connect()
+    yield
+    metadata_client.drop_all(engine)
+    metadata_server.drop_all(engine)
+    await database.disconnect()
+
 
 @pytest.fixture
 async def startup_and_shutdown_server():
@@ -19,12 +36,14 @@ async def startup_and_shutdown_server():
 
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
-    assert await DsnetApi(URL('http://localhost:12345')).get_server_version() == {
+    assert await DsnetApi(URL('http://localhost:12345'), None).get_server_version() == {
         'message': 'Datashare Network Server version 0.1.0'}
 
 
-@pytest.mark.skip(reason='TODO integration test')
 @pytest.mark.asyncio
-async def test_send_query(startup_and_shutdown_server):
+async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    assert await DsnetApi(URL('http://localhost:12345'), repository).send_query('payload_value') == True
+    keys = gen_key_pair()
+    await repository.save_peer(Peer(keys.public))
+    await DsnetApi(URL('http://localhost:12345'), repository).send_query('payload_value')
+    assert len(await repository.get_conversations()) == 1
