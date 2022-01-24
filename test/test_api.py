@@ -45,5 +45,9 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
+
     await DsnetApi(URL('http://localhost:12345'), repository).send_query('payload_value')
-    assert len(await repository.get_conversations()) == 1
+
+    conversations = await repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].query == 'payload_value'
