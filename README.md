@@ -1,4 +1,4 @@
-# datashare network client library 
+# datashare network client library  [![CircleCI](https://circleci.com/gh/ICIJ/datashare-network-client/tree/main.svg?style=svg&circle-token=f53a35915c04a1014e6a1f358904e54366af91a6)](https://circleci.com/gh/ICIJ/datashare-network-client/tree/main)
 
 This is the client library for the protocol described in the EPFL paper:
 
