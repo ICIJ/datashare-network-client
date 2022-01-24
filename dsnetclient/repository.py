@@ -171,11 +171,9 @@ class SqlalchemyRepository(Repository):
         all_ = await self.database.fetch_all(stmt)
         return all_ # TODO: map to Conversation objects
 
-
     async def peers(self) -> List[Peer]:
         stmt = peer_table.select()
         return [Peer(**peer) for peer in await self.database.fetch_all(stmt)]
-
 
     async def save_peer(self, peer: Peer):
         await self.database.execute(insert(peer_table).values(public_key=peer.public_key))
