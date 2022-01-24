@@ -7,6 +7,10 @@ jobs:
     steps:
       - checkout
 
+      - run:
+          name: install python-dev
+          command: sudo apt install -y python3-dev
+
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "Pipfile.lock" }}
