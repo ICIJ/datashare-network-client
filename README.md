@@ -11,3 +11,19 @@ This is a work in progress.
 ```shell
 $ make test
 ```
+
+## Database
+
+To run the migrations on `dsnet.db` :
+
+```shell
+$ /path/to/alembic upgrade head 
+```
+
+If you change the models, then please run : 
+
+```shell
+$ alembic revision --autogenerate -m "migration description"
+```
+
+It will generate a new migration step file in `migrations/versions` that you can add with your commit.
