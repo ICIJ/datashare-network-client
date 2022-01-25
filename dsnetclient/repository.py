@@ -1,10 +1,13 @@
 import abc
+from collections import defaultdict
 from datetime import datetime
-from typing import List
+from functools import reduce
+from typing import List, Mapping
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole, Message
 from sqlalchemy import insert, select
+from sqlalchemy.sql import Select
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table
 
@@ -142,34 +145,31 @@ class SqlalchemyRepository(Repository):
         await self.database.execute(stmt)
 
     async def get_conversation_by_key(self, public_key) -> Conversation:
-        return await self._get_conversation(conversation_table.select().where(conversation_table.c.public_key == public_key))
+        stmt = self._create_conversation_statement().where(conversation_table.c.public_key == public_key)
+        return (await self.get_conversations(stmt))[0]
 
     async def get_conversation_by_address(self, address):
-        stmt = select(pigeonhole_table.c.conversation_id).where(pigeonhole_table.c.address == address)
-        conversation_id, = await self.database.fetch_one(stmt)
-        return await self._get_conversation(conversation_table.select().where(conversation_table.c.id == conversation_id))
+        stmt = self._create_conversation_statement().where(pigeonhole_table.c.address == address)
+        return (await self.get_conversations(stmt))[0]
 
-    async def _get_conversation(self, statement) -> Conversation:
-        row = await self.database.fetch_one(statement)
+    async def get_conversations(self, statement=None) -> List[Conversation]:
+        stmt = self._create_conversation_statement() if statement is None else statement
+        conversation_maps = await self.database.fetch_all(stmt)
+        return self._merge_conversations(conversation_maps)
 
-        phs = [
-            PigeonHole(public_key_for_dh=row['public_key'], message_number=row['message_number'], dh_key=row['dh_key'])
-            for row in await self.database.fetch_all(
-                pigeonhole_table.select().where(pigeonhole_table.c.conversation_id == row['id']))]
-        msgs = [Message(address=row['address'], payload=row['payload'], from_key=row['from_key'],
-                        timestamp=row['timestamp'])
-                for row in await self.database.fetch_all(
-                message_table.select().where(message_table.c.conversation_id == row['id']))]
+    def _create_conversation_statement(self) -> Select:
+        return select(conversation_table, pigeonhole_table, message_table).join(pigeonhole_table).outerjoin(message_table)
 
-        return Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'], pigeonholes=phs,
-                            messages=msgs)
-
-    async def get_conversations(self) -> List[Conversation]:
-        stmt = conversation_table.select().join(pigeonhole_table,
-                                                conversation_table.c.id == pigeonhole_table.c.conversation_id).join(
-            message_table, conversation_table.c.id == message_table.c.conversation_id, isouter=True)
-        all_ = await self.database.fetch_all(stmt)
-        return all_ # TODO: map to Conversation objects
+    def _merge_conversations(self, conversation_maps: List[Mapping]) -> List[Conversation]:
+        messages_dict = defaultdict(dict)
+        ph_dict = defaultdict(dict)
+        conversations = dict()
+        for row in conversation_maps:
+            conversations[row['id']] = Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'])
+            ph_dict[row['id']][row['address']] = PigeonHole(public_key_for_dh=row['public_key_1'], message_number=row['message_number'],
+                           dh_key=row['dh_key'])
+            messages_dict[row['id']][row['address_1']] = Message(address=row['address_1'], payload=row['payload'], from_key=row['from_key'], timestamp=row['timestamp'])
+        return [Conversation(c.private_key, c.other_public_key, c.query, c.querier, pigeonholes=list(ph_dict[id].values()), messages=list(messages_dict[id].values())) for id, c in conversations.items()]
 
     async def peers(self) -> List[Peer]:
         stmt = peer_table.select()

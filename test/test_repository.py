@@ -135,6 +135,25 @@ async def test_get_conversations(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
+async def test_get_conversations_with_messages(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+    carol_side = Conversation(carol_keys.private, query_keys.public, query='Hello', querier=False)
+    querier_side = Conversation(query_keys.private, carol_keys.public, query='Hello', querier=True)
+    querier_side.add_message(carol_side.create_response("Hi"))
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(querier_side)
+
+    conversations = await repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].query == 'Hello'
+    assert len(conversations[0]._pigeonholes) == 2
+    assert len(conversations[0]._messages) == 1
+    assert conversations[0].last_message.payload == b'Hi'
+
+
+@pytest.mark.asyncio
 async def test_save_get_peers(connect_disconnect_db):
     peer_keys = gen_key_pair()
     repository = SqlalchemyRepository(database)
