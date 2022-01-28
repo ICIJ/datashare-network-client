@@ -9,7 +9,7 @@ aiohttp = '*'
 
 [dev-packages]
 alembic = "*"
-datashare-network-server = "==0.2.0"
+datashare-network-server = "==0.2.1"
 uvicorn = {extras = ["standard"], version = "*"}
 pytest = '*'
 pytest-asyncio = '*'

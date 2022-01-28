@@ -2,7 +2,7 @@ import asyncio
 from asyncio import Event
 from typing import Awaitable, Coroutine, Callable
 
-from aiohttp import ClientSession, WSMsgType
+from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair
 
@@ -14,11 +14,12 @@ import logging
 
 class DsnetApi:
     def __init__(self, url: URL, repository: Repository,
-                 notification_cb: Callable[[bytes], Awaitable[None]] = None) -> None:
+                 notification_cb: Callable[[bytes], Awaitable[None]] = None, reconnect_delay_seconds=2) -> None:
         self.repository = repository
         self.base_url = url
         self.client = ClientSession()
         self.notification_cb = notification_cb
+        self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         if notification_cb is not None:
             self._listener = asyncio.get_event_loop().create_task(self.notifications())
@@ -42,15 +43,18 @@ class DsnetApi:
         self.stop = True
 
     async def notifications(self):
-        async with ClientSession() as session:
-            async with session.ws_connect(self.base_url.join(URL('/notifications'))) as ws:
-                while not self.stop:
-                    async for msg in ws:
-                        if msg.type == WSMsgType.BINARY:
-                            await self.notification_cb(msg.data)
-                        elif msg.type == WSMsgType.TEXT:
-                            await self.notification_cb(msg.data.encode("utf-8"))
-                        else:
-                            logging.warning(f"received unhandled type {msg.type}")
-
+        while not self.stop:
+            try:
+                async with ClientSession() as session:
+                    async with session.ws_connect(self.base_url.join(URL('/notifications'))) as ws:
+                        async for msg in ws:
+                            if msg.type == WSMsgType.BINARY:
+                                await self.notification_cb(msg.data)
+                            elif msg.type == WSMsgType.TEXT:
+                                await self.notification_cb(msg.data.encode("utf-8"))
+                            else:
+                                logging.warning(f"received unhandled type {msg.type}")
+            except ClientConnectorError:
+                logging.warning(f"client connection waiting {self.reconnect_delay_seconds} before reconnect")
+                await asyncio.sleep(self.reconnect_delay_seconds)
 

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "479c06378861c727b93c01421a4573e410463bdc5d73f9d3abf2fe6041df58ee"
+            "sha256": "7fbaccd85fd333226b20695cf274e080f3b74a51e0b8ead5ca536ad1782378b0"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -636,11 +636,11 @@
         },
         "datashare-network-server": {
             "hashes": [
-                "sha256:64a8b2c5f1e54ff6d33e559af653f39c8f227fb052d3e63ac9b4817793b1c022",
-                "sha256:a94a1b0656f9b4e7f6fe6d467bf8100582bcaea7693962da52c40767fb1517dc"
+                "sha256:23e88f5e6dcbbaaeb1b0712ea8cd67a86eea0ac935817ff8c292cb514fd04670",
+                "sha256:e85fe7f7fc559e6ff67d6dbb03d7cac8af80cc529ad8f4d00ec7a4bd7d76290c"
             ],
             "index": "pypi",
-            "version": "==0.2.0"
+            "version": "==0.2.1"
         },
         "docutils": {
             "hashes": [

@@ -1,3 +1,4 @@
+import asyncio
 from asyncio import Event
 
 import databases
@@ -39,7 +40,7 @@ async def startup_and_shutdown_server():
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
     assert await DsnetApi(URL('http://localhost:12345'), None).get_server_version() == {
-        'message': 'Datashare Network Server version 0.2.0'}
+        'message': 'Datashare Network Server version 0.2.1'}
 
 
 @pytest.mark.asyncio
@@ -66,3 +67,30 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 
     await cb_called.wait()
     api.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(5)
+async def test_close_websocket(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    local_server = UvicornTestServer('dsnetserver.main:app', port=23456)
+    await local_server.up()
+
+    keys = gen_key_pair()
+    await repository.save_peer(Peer(keys.public))
+
+    cb_called = Event()
+
+    async def cb(payload: bytes) -> None:
+        assert payload is not None
+        cb_called.set()
+
+    api = DsnetApi(URL('http://localhost:23456'), repository, cb, reconnect_delay_seconds=0.1)
+    await local_server.down()
+    await local_server.up()
+    await asyncio.sleep(0.2)
+
+    await api.send_query('payload_value')
+    await cb_called.wait()
+    api.close()
+    await local_server.down()
