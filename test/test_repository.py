@@ -2,6 +2,7 @@ from sqlite3 import IntegrityError
 
 import databases
 import pytest
+import pytest_asyncio
 from dsnet.core import PigeonHole, Conversation, Message
 from dsnet.crypto import gen_key_pair
 from sqlalchemy import create_engine
@@ -13,7 +14,7 @@ DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def connect_disconnect_db():
     engine = create_engine(DATABASE_URL)
     metadata.create_all(engine)

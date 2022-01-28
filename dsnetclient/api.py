@@ -21,6 +21,7 @@ class DsnetApi:
         self.notification_cb = notification_cb
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
+        self.ws = None
         if notification_cb is not None:
             self._listener = asyncio.get_event_loop().create_task(self.notifications())
 
@@ -39,15 +40,18 @@ class DsnetApi:
         async with self.client.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
             response.raise_for_status()
 
-    def close(self):
+    async def close(self):
         self.stop = True
+        if self.ws is not None: await self.ws.close()
+        await self._listener
 
     async def notifications(self):
         while not self.stop:
+            self.ws = None
             try:
                 async with ClientSession() as session:
-                    async with session.ws_connect(self.base_url.join(URL('/notifications'))) as ws:
-                        async for msg in ws:
+                    async with session.ws_connect(self.base_url.join(URL('/notifications'))) as self.ws:
+                        async for msg in self.ws:
                             if msg.type == WSMsgType.BINARY:
                                 await self.notification_cb(msg.data)
                             elif msg.type == WSMsgType.TEXT:
