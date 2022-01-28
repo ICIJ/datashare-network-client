@@ -1,3 +1,5 @@
+from asyncio import Event
+
 import databases
 import pytest
 from dsnet.crypto import gen_key_pair
@@ -37,17 +39,30 @@ async def startup_and_shutdown_server():
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
     assert await DsnetApi(URL('http://localhost:12345'), None).get_server_version() == {
-        'message': 'Datashare Network Server version 0.1.0'}
+        'message': 'Datashare Network Server version 0.2.0'}
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(5)
 async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
 
-    await DsnetApi(URL('http://localhost:12345'), repository).send_query('payload_value')
+    cb_called = Event()
+
+    async def cb(payload: bytes) -> None:
+        assert payload is not None
+        #assert payload[0] == 1
+        assert payload[-len(b'payload_value'):] == b'payload_value'
+        cb_called.set()
+
+    api = DsnetApi(URL('http://localhost:12345'), repository, cb)
+    await api.send_query('payload_value')
 
     conversations = await repository.get_conversations()
     assert len(conversations) == 1
     assert conversations[0].query == 'payload_value'
+
+    await cb_called.wait()
+    api.close()

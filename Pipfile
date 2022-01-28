@@ -9,10 +9,11 @@ aiohttp = '*'
 
 [dev-packages]
 alembic = "*"
-datashare-network-server = "*"
+datashare-network-server = "==0.2.0"
 uvicorn = {extras = ["standard"], version = "*"}
 pytest = '*'
 pytest-asyncio = '*'
+pytest-timeout = '*'
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
 twine = "==3.2.0"
