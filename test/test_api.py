@@ -53,7 +53,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 
     async def cb(payload: bytes) -> None:
         assert payload is not None
-        #assert payload[0] == 1
+        assert payload[0] == 1
         assert payload[-len(b'payload_value'):] == b'payload_value'
         cb_called.set()
 
