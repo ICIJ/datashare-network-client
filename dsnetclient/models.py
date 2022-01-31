@@ -30,20 +30,20 @@ message_table = Table(
     "message",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("address", LargeBinary),
+    Column("address", LargeBinary, nullable=False),
     Column('timestamp', DateTime, nullable=False),
     Column('message_number', Integer, nullable=False),
     Column("from_key", LargeBinary, index=True, nullable=False),
     Column("payload", Text, nullable=False),
-    Column("conversation_id", Integer, ForeignKey('conversation.id')),
+    Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False),
 )
 
 pigeonhole_table = Table(
     "pigeonhole",
     metadata,
     Column("address", LargeBinary, primary_key=True),
-    Column("dh_key", LargeBinary),
-    Column("public_key", LargeBinary),
-    Column("message_number", Integer),
-    Column("conversation_id", Integer, ForeignKey('conversation.id')),
+    Column("dh_key", LargeBinary, nullable=False),
+    Column("public_key", LargeBinary, nullable=False),
+    Column("message_number", Integer, nullable=False),
+    Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False),
 )
