@@ -22,7 +22,7 @@ conversation_table = Table(
     Column('nb_sent_messages', Integer, nullable=False),
     Column('nb_recv_messages', Integer, nullable=False),
     Column('querier', Boolean, nullable=False, default=False),
-    Column('query', Text, nullable=False),
+    Column('query', LargeBinary, nullable=True),
     Column('created_at', DateTime, nullable=False),
 )
 
@@ -34,7 +34,7 @@ message_table = Table(
     Column('timestamp', DateTime, nullable=False),
     Column('message_number', Integer, nullable=False),
     Column("from_key", LargeBinary, index=True, nullable=False),
-    Column("payload", Text, nullable=False),
+    Column("payload", LargeBinary, nullable=False),
     Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False),
 )
 

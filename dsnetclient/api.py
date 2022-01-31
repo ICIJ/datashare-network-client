@@ -4,7 +4,7 @@ from typing import Awaitable, Coroutine, Callable
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
-from dsnet.core import Conversation, Query
+from dsnet.core import Conversation, Query, PigeonHole
 from dsnet.crypto import gen_key_pair
 from sqlalchemy import create_engine
 
@@ -16,9 +16,10 @@ import logging
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, reconnect_delay_seconds=2) -> None:
+    def __init__(self, url: URL, repository: Repository, private_key: bytes, reconnect_delay_seconds=2) -> None:
         self.repository = repository
         self.base_url = url
+        self.private_key = private_key
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
@@ -28,7 +29,7 @@ class DsnetApi:
             async with session.get(self.base_url) as resp:
                 return await resp.json()
 
-    async def send_query(self, query: str) -> None:
+    async def send_query(self, query: bytes) -> None:
         query_keys = gen_key_pair()
 
         for peer in await self.repository.peers():
@@ -39,6 +40,16 @@ class DsnetApi:
         async with ClientSession() as session:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
+
+    async def send_response(self, public_key: bytes, response_data: bytes):
+        conv = Conversation(private_key=self.private_key, other_public_key=public_key, query=None)
+        await self.repository.save_conversation(conv)
+        response = conv.create_response(response_data)
+        address = response.address.hex()
+
+        async with ClientSession() as session:
+            async with session.post(self.base_url.join(URL(f'/ph/{address}')), data=response.payload) as http_response:
+                http_response.raise_for_status()
 
     async def close(self):
         self.stop = True
@@ -54,7 +65,7 @@ class DsnetApi:
                             if msg.type == WSMsgType.BINARY:
                                 await notification_cb(msg.data)
                             elif msg.type == WSMsgType.TEXT:
-                                await notification_cb(msg.data.encode("utf-8"))
+                                await notification_cb(msg.data)
                             else:
                                 logging.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:

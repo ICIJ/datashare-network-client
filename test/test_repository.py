@@ -70,7 +70,7 @@ async def test_save_conversation_with_a_query(connect_disconnect_db):
     query_keys = gen_key_pair()
     bob_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, bob_keys.public, query='France', querier=True)
+    conversation = Conversation(query_keys.private, bob_keys.public, query=b'France', querier=True)
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -94,12 +94,12 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
 
     query_keys = gen_key_pair()
     alicia_keys = gen_key_pair()
-    conversation = Conversation(query_keys.private, alicia_keys.public, query='Pop', querier=True)
+    conversation = Conversation(query_keys.private, alicia_keys.public, query=b'Pop', querier=True)
     ph = conversation.pigeonhole_for_address(conversation.last_address)
-    encrypted_message1 = ph.encrypt('alicia response1')
+    encrypted_message1 = ph.encrypt(b'alicia response1')
     conversation.add_message(Message(conversation.last_address, encrypted_message1, alicia_keys.public))
     ph = conversation.pigeonhole_for_address(conversation.last_address)
-    encrypted_message2 = ph.encrypt('alicia response2')
+    encrypted_message2 = ph.encrypt(b'alicia response2')
     conversation.add_message(Message(conversation.last_address, encrypted_message2, alicia_keys.public))
 
     await repository.save_conversation(conversation)
@@ -113,7 +113,7 @@ async def test_get_conversation_by_address(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, carol_keys.public, query='France', querier=True)
+    conversation = Conversation(query_keys.private, carol_keys.public, query=b'France', querier=True)
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -126,29 +126,42 @@ async def test_get_conversations(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, carol_keys.public, query='Hello', querier=True)
+    conversation = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
 
     assert len(await repository.get_conversations()) == 1
-    assert (await repository.get_conversations())[0].query == 'Hello'
+    assert (await repository.get_conversations())[0].query == b'Hello'
+
+
+@pytest.mark.asyncio
+async def test_get_conversations_filter_by_properties(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+
+    conversation = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(conversation)
+
+    assert len(await repository.get_conversations_filter_by(querier=True)) == 1
 
 
 @pytest.mark.asyncio
 async def test_get_conversations_with_messages(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
-    carol_side = Conversation(carol_keys.private, query_keys.public, query='Hello', querier=False)
-    querier_side = Conversation(query_keys.private, carol_keys.public, query='Hello', querier=True)
-    querier_side.add_message(carol_side.create_response("Hi"))
+    carol_side = Conversation(carol_keys.private, query_keys.public, query=b'Hello', querier=False)
+    querier_side = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
+    querier_side.add_message(carol_side.create_response(b"Hi"))
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(querier_side)
 
     conversations = await repository.get_conversations()
     assert len(conversations) == 1
-    assert conversations[0].query == 'Hello'
+    assert conversations[0].query == b'Hello'
     assert len(conversations[0]._pigeonholes) == 2
     assert len(conversations[0]._messages) == 1
     assert conversations[0].last_message.payload == b'Hi'

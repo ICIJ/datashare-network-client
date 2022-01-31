@@ -1,12 +1,11 @@
 import abc
 from collections import defaultdict
 from datetime import datetime
-from functools import reduce
 from typing import List, Mapping
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole, Message
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, and_, column
 from sqlalchemy.sql import Select
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table
@@ -19,6 +18,16 @@ class Peer:
 
 
 class Repository(metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    async def get_conversations_filter_by(self, **kwargs) -> List[Conversation]:
+        """
+        Get database conversation list filtered by some Conversation properties
+
+        :param kwargs:
+        :return: Conversation list
+        """
+
     @abc.abstractmethod
     async def get_conversation_by_key(self, conversation_pub_key: bytes) -> Conversation:
         """
@@ -148,9 +157,14 @@ class SqlalchemyRepository(Repository):
         stmt = self._create_conversation_statement().where(conversation_table.c.public_key == public_key)
         return (await self.get_conversations(stmt))[0]
 
-    async def get_conversation_by_address(self, address):
+    async def get_conversation_by_address(self, address) -> Conversation:
         stmt = self._create_conversation_statement().where(pigeonhole_table.c.address == address)
         return (await self.get_conversations(stmt))[0]
+
+    async def get_conversations_filter_by(self, **kwargs) -> List[Conversation]:
+        clauses = [column(key) == value for key, value in kwargs.items()]
+        stmt = self._create_conversation_statement().where(*clauses)
+        return await self.get_conversations(stmt)
 
     async def get_conversations(self, statement=None) -> List[Conversation]:
         stmt = self._create_conversation_statement() if statement is None else statement

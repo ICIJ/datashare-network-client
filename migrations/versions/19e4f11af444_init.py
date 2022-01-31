@@ -26,7 +26,7 @@ def upgrade():
     sa.Column('nb_sent_messages', sa.Integer(), nullable=False),
     sa.Column('nb_recv_messages', sa.Integer(), nullable=False),
     sa.Column('querier', sa.Boolean(), nullable=False),
-    sa.Column('query', sa.Text(), nullable=False),
+    sa.Column('query', sa.LargeBinary(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
@@ -44,7 +44,7 @@ def upgrade():
     sa.Column('timestamp', sa.DateTime(), nullable=False),
     sa.Column('message_number', sa.Integer(), nullable=False),
     sa.Column('from_key', sa.LargeBinary(), nullable=False),
-    sa.Column('payload', sa.Text(), nullable=False),
+    sa.Column('payload', sa.LargeBinary(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversation.id'], ),
     sa.PrimaryKeyConstraint('id')
