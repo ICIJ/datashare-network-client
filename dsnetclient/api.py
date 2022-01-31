@@ -1,5 +1,5 @@
 import asyncio
-from asyncio import Event
+from asyncio import Event, Task
 from typing import Awaitable, Coroutine, Callable
 
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
@@ -13,17 +13,13 @@ import logging
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository,
-                 notification_cb: Callable[[bytes], Awaitable[None]] = None, reconnect_delay_seconds=2) -> None:
+    def __init__(self, url: URL, repository: Repository, reconnect_delay_seconds=2) -> None:
         self.repository = repository
         self.base_url = url
         self.client = ClientSession()
-        self.notification_cb = notification_cb
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
-        if notification_cb is not None:
-            self._listener = asyncio.get_event_loop().create_task(self.notifications())
 
     async def get_server_version(self) -> dict:
         async with self.client.get(self.base_url) as resp:
@@ -42,10 +38,10 @@ class DsnetApi:
 
     async def close(self):
         self.stop = True
+        await self.client.close()
         if self.ws is not None: await self.ws.close()
-        await self._listener
 
-    async def notifications(self):
+    async def start_listening(self, notification_cb: Callable[[bytes], Awaitable[None]] = None):
         while not self.stop:
             self.ws = None
             try:
@@ -53,12 +49,14 @@ class DsnetApi:
                     async with session.ws_connect(self.base_url.join(URL('/notifications'))) as self.ws:
                         async for msg in self.ws:
                             if msg.type == WSMsgType.BINARY:
-                                await self.notification_cb(msg.data)
+                                await notification_cb(msg.data)
                             elif msg.type == WSMsgType.TEXT:
-                                await self.notification_cb(msg.data.encode("utf-8"))
+                                await notification_cb(msg.data.encode("utf-8"))
                             else:
                                 logging.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:
                 logging.warning(f"client connection waiting {self.reconnect_delay_seconds} before reconnect")
                 await asyncio.sleep(self.reconnect_delay_seconds)
 
+    def background_listening(self, notification_cb: Callable[[bytes], Awaitable[None]] = None) -> Task:
+        return asyncio.get_event_loop().create_task(self.start_listening(notification_cb))

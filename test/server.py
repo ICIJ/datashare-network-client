@@ -36,9 +36,13 @@ class UvicornTestServer(uvicorn.Server):
     async def up(self) -> None:
         """Start up server asynchronously"""
         self._serve_task = asyncio.create_task(self.serve())
+        while not self.started:
+            await asyncio.sleep(0.1)
         await self._startup_done.wait()
 
     async def down(self) -> None:
         """Shut down server asynchronously"""
         self.should_exit = True
+        await self.shutdown()
+        self._startup_done.clear()
         await self._serve_task
