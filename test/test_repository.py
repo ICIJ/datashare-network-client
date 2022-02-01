@@ -85,8 +85,6 @@ async def test_save_conversation(connect_disconnect_db):
     assert actual_conversation.other_public_key == conversation.other_public_key
     assert actual_conversation.querier == conversation.querier
     assert actual_conversation.query == conversation.query
-    assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
-    assert actual_conversation.nb_recv_messages == conversation.nb_recv_messages
     assert actual_conversation.is_receiving(conversation.last_address)
     assert actual_conversation.created_at == conversation.created_at
     assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
