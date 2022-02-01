@@ -5,7 +5,7 @@ from typing import Awaitable, Coroutine, Callable
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query, PigeonHole
-from dsnet.crypto import gen_key_pair
+from dsnet.crypto import gen_key_pair, get_public_key
 from sqlalchemy import create_engine
 
 from yarl import URL
@@ -31,10 +31,11 @@ class DsnetApi:
 
     async def send_query(self, query: bytes) -> None:
         query_keys = gen_key_pair()
-
+        public_key = get_public_key(self.private_key)
         for peer in await self.repository.peers():
-            conv = Conversation(query_keys.private, peer.public_key, query, querier=True)
-            await self.repository.save_conversation(conv)
+            if peer.public_key != public_key:
+                conv = Conversation.create_from_querier(query_keys.private, peer.public_key, query)
+                await self.repository.save_conversation(conv)
 
         payload = Query(query_keys.public, query).to_bytes()
         async with ClientSession() as session:
@@ -42,13 +43,12 @@ class DsnetApi:
                 response.raise_for_status()
 
     async def send_response(self, public_key: bytes, response_data: bytes):
-        conv = Conversation(private_key=self.private_key, other_public_key=public_key, query=None)
-        await self.repository.save_conversation(conv)
+        conv = Conversation.create_from_recipient(private_key=self.private_key, other_public_key=public_key)
         response = conv.create_response(response_data)
-        address = response.address.hex()
+        await self.repository.save_conversation(conv)
 
         async with ClientSession() as session:
-            async with session.post(self.base_url.join(URL(f'/ph/{address}')), data=response.payload) as http_response:
+            async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.payload) as http_response:
                 http_response.raise_for_status()
 
     async def close(self):

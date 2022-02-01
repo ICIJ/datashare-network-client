@@ -1,11 +1,12 @@
 import asyncio
 from asyncio import Event
+from datetime import datetime
 
 import databases
 import dsnetserver
 import pytest
 import pytest_asyncio
-from dsnet.core import Query
+from dsnet.core import Query, MessageType
 from dsnet.crypto import gen_key_pair
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
@@ -63,13 +64,8 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
         cb_called.set()
 
     api = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys.private)
-
-    task = api.background_listening(cb)
+    api.background_listening(cb)
     await api.send_query(b'payload_value')
-
-    conversations = await repository.get_conversations()
-    assert len(conversations) == 1
-    assert conversations[0].query == b'payload_value'
 
     await cb_called.wait()
     await api.close()
@@ -117,7 +113,6 @@ async def test_websocket_reconnect(connect_disconnect_db):
     await local_server.down()
 
 
-@pytest.mark.skip("WIP")
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_send_response(startup_and_shutdown_server, connect_disconnect_db):
@@ -131,20 +126,22 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     api_bob = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys_bob.private)
 
     async def cb_alice(payload):
-        if payload[0] == 2:
+        if payload[0] == MessageType.NOTIFICATION:
             convs = await repository.get_conversations_filter_by(querier=True)
             assert len(convs) == 1
             assert payload[1:4] == convs[0].last_address[0:3]
 
     async def cb_bob(payload):
-        query = Query.from_bytes(payload)
-        await api_bob.send_response(query.public_key, b"response payload")
+        if payload[0] == MessageType.QUERY:
+            query = Query.from_bytes(payload)
+            await api_bob.send_response(query.public_key, b"response payload")
 
-    task_alice = api_bob.background_listening(cb_alice)
+    task_alice = api_alice.background_listening(cb_alice)
     task_bob = api_bob.background_listening(cb_bob)
 
     await api_alice.send_query(b"query payload")
-    await api_alice.close()
+
     await api_bob.close()
-    await task_alice
+    await api_alice.close()
     await task_bob
+    await task_alice
