@@ -1,6 +1,5 @@
 import asyncio
 from asyncio import Event
-from datetime import datetime
 
 import databases
 import dsnetserver

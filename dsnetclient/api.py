@@ -1,18 +1,17 @@
 import asyncio
-from asyncio import Event, Task
-from typing import Awaitable, Coroutine, Callable
+import logging
+from asyncio import Task
+from typing import Awaitable, Callable
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
-from dsnet.core import Conversation, Query, PigeonHole
+from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair, get_public_key
 from sqlalchemy import create_engine
-
 from yarl import URL
 
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
-import logging
 
 
 class DsnetApi:
