@@ -5,7 +5,7 @@ from typing import List, Mapping
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole, Message
-from sqlalchemy import insert, select, and_, column
+from sqlalchemy import insert, select, column
 from sqlalchemy.sql import Select
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table
@@ -136,7 +136,7 @@ class SqlalchemyRepository(Repository):
                                                   nb_sent_messages=conversation.nb_sent_messages,
                                                   nb_recv_messages=conversation.nb_recv_messages,
                                                   querier=conversation.querier,
-                                                  created_at=datetime.now(),
+                                                  created_at=conversation.created_at,
                                                   query=conversation.query))
             for ph in conversation._pigeonholes.values():
                 await self.save_pigeonhole(ph, conversation_id)
@@ -179,11 +179,12 @@ class SqlalchemyRepository(Repository):
         ph_dict = defaultdict(dict)
         conversations = dict()
         for row in conversation_maps:
-            conversations[row['id']] = Conversation(row['private_key'], row['other_public_key'], row['query'], row['querier'])
+            conversations[row['id']] = Conversation(row['private_key'], row['other_public_key'], row['nb_sent_messages'], row['nb_recv_messages'],
+                                                    row['querier'], row['created_at'], row['query'])
             ph_dict[row['id']][row['address']] = PigeonHole(public_key_for_dh=row['public_key_1'], message_number=row['message_number'],
                            dh_key=row['dh_key'])
             messages_dict[row['id']][row['address_1']] = Message(address=row['address_1'], payload=row['payload'], from_key=row['from_key'], timestamp=row['timestamp'])
-        return [Conversation(c.private_key, c.other_public_key, c.query, c.querier, pigeonholes=list(ph_dict[id].values()), messages=list(messages_dict[id].values())) for id, c in conversations.items()]
+        return [Conversation(c.private_key, c.other_public_key, c.nb_sent_messages, c.nb_recv_messages, c.querier, c.created_at, c.query, pigeonholes=list(ph_dict[id].values()), messages=list(messages_dict[id].values())) for id, c in conversations.items()]
 
     async def peers(self) -> List[Peer]:
         stmt = peer_table.select()

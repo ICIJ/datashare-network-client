@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlite3 import IntegrityError
 
 import databases
@@ -66,11 +67,13 @@ async def test_delete_pigeonhole(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
-async def test_save_conversation_with_a_query(connect_disconnect_db):
+async def test_save_conversation(connect_disconnect_db):
     query_keys = gen_key_pair()
     bob_keys = gen_key_pair()
-
-    conversation = Conversation(query_keys.private, bob_keys.public, query=b'France', querier=True)
+    conversation = Conversation.create_from_querier(query_keys.private, bob_keys.public, query=b'France')
+    conversation.nb_sent_messages = 12
+    conversation.nb_recv_messages = 9
+    conversation.created_at = datetime(2022, 1, 2, 3, 4, 5)
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -84,7 +87,10 @@ async def test_save_conversation_with_a_query(connect_disconnect_db):
     assert actual_conversation.query == conversation.query
     assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
     assert actual_conversation.nb_recv_messages == conversation.nb_recv_messages
-    assert actual_conversation.is_receiving(conversation.last_address) == True
+    assert actual_conversation.is_receiving(conversation.last_address)
+    assert actual_conversation.created_at == conversation.created_at
+    assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
+    assert actual_conversation.nb_recv_messages == conversation.nb_recv_messages
     assert await repository.get_pigeonhole(actual_conversation.last_address) is not None
 
 
@@ -94,7 +100,7 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
 
     query_keys = gen_key_pair()
     alicia_keys = gen_key_pair()
-    conversation = Conversation(query_keys.private, alicia_keys.public, query=b'Pop', querier=True)
+    conversation = Conversation.create_from_querier(query_keys.private, alicia_keys.public, query=b'Pop')
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message1 = ph.encrypt(b'alicia response1')
     conversation.add_message(Message(conversation.last_address, encrypted_message1, alicia_keys.public))
@@ -113,7 +119,7 @@ async def test_get_conversation_by_address(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, carol_keys.public, query=b'France', querier=True)
+    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'France')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -126,7 +132,7 @@ async def test_get_conversations(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
+    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -140,7 +146,7 @@ async def test_get_conversations_filter_by_properties(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
+    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -152,8 +158,8 @@ async def test_get_conversations_filter_by_properties(connect_disconnect_db):
 async def test_get_conversations_with_messages(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
-    carol_side = Conversation(carol_keys.private, query_keys.public, query=b'Hello', querier=False)
-    querier_side = Conversation(query_keys.private, carol_keys.public, query=b'Hello', querier=True)
+    carol_side = Conversation.create_from_recipient(carol_keys.private, query_keys.public)
+    querier_side = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
     querier_side.add_message(carol_side.create_response(b"Hi"))
 
     repository = SqlalchemyRepository(database)

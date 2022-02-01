@@ -4,10 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = '==0.2.0'
+datashare-network-core = '==0.3.0'
 aiohttp = '*'
 
 [dev-packages]
+pytest-httpserver = "*"
 alembic = "*"
 datashare-network-server = "==0.2.1"
 uvicorn = {extras = ["standard"], version = "*"}
