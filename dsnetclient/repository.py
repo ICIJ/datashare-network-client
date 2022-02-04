@@ -105,10 +105,25 @@ class Repository(metaclass=abc.ABCMeta):
         Save peer
         """
 
+    @abc.abstractmethod
+    async def get_pigeonholes_by_adr(self, adr: bytes) -> List[PigeonHole]:
+        """
+        get the list of pigeonholes beginning with adr
+
+        :param adr: short pigeon hole address
+        :return: list of matching pigeonholes
+        """
+
 
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
+
+    async def get_pigeonholes_by_adr(self, adr: bytes) -> List[PigeonHole]:
+        # stmt = pigeonhole_table.select().where(pigeonhole_table.c.address.like(adr+b'%')) TODO make that work
+        stmt = pigeonhole_table.select()
+        rows = await self.database.fetch_all(stmt)
+        return [PigeonHole(public_key_for_dh=row['public_key'], message_number=row['message_number'], dh_key=row['dh_key']) for row in rows]
 
     async def get_pigeonhole(self, address: bytes) -> PigeonHole:
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.address == address)

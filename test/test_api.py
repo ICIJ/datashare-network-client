@@ -5,7 +5,7 @@ import databases
 import pytest
 import pytest_asyncio
 from dsnet.crypto import gen_key_pair
-from dsnet.message import Query
+from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage
 from pytest_httpserver import HTTPServer
 from pytest_httpserver.httpserver import HandlerType
 from sqlalchemy import create_engine
@@ -81,7 +81,7 @@ async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disc
 
 
 @pytest.mark.asyncio
-async def test_receive_own_query(httpserver: HTTPServer, connect_disconnect_db):
+async def test_do_not_treat_my_own_query(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     mocked_index = Mock(Index)
     api = await create_api(httpserver, mocked_index)
@@ -91,6 +91,28 @@ async def test_receive_own_query(httpserver: HTTPServer, connect_disconnect_db):
     await api.handle_query(Query(conv.public_key, b'foo'))
 
     mocked_index.search.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_receive_ph_notification_no_listening_address(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.respond_permanent_failure()
+    api = await create_api(httpserver)
+    await api.handle_ph_notification(PigeonHoleNotification('beef')) # if server is called it will break
+
+
+@pytest.mark.skip
+@pytest.mark.asyncio
+async def test_receive_ph_notification_with_matching_address(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    api = await create_api(httpserver)
+    await api.send_query(b'query')
+    conv = (await api.repository.get_conversations())[0]
+    msg = PigeonHoleMessage(conv.last_address, b'response encrypted', gen_key_pair().public)
+    httpserver.expect_request(re.compile(f"/ph/{conv.last_address.hex()}"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200, response=msg.to_bytes()))
+
+    await api.handle_ph_notification(PigeonHoleNotification.from_address(conv.last_address))
+
+    httpserver.check()
 
 
 async def create_api(httpserver, index = None):

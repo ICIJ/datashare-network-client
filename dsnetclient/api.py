@@ -6,7 +6,7 @@ import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair, get_public_key
-from dsnet.message import Message, MessageType
+from dsnet.message import Message, MessageType, PigeonHoleNotification, PigeonHoleMessage
 from sqlalchemy import create_engine
 from yarl import URL
 
@@ -86,13 +86,19 @@ class DsnetApi:
             await self.handle_ph_notification(message)
         elif message.type() == MessageType.QUERY:
             await self.handle_query(message)
-        elif message.type() == MessageType.MESSAGE:
-            await self.handle_message(message)
         else:
             logger.warning(f"received unhandled type {message.type()}")
 
-    async def handle_ph_notification(self, msg: Message) -> None:
-        pass
+    async def handle_ph_notification(self, msg: PigeonHoleNotification) -> None:
+        logger.info(f"received ph notification for {msg.adr_hex}")
+        async with ClientSession() as session:
+            for ph in await self.repository.get_pigeonholes_by_adr(bytes.fromhex(msg.adr_hex)):
+                async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
+                    http_response.raise_for_status()
+                    payload = await http_response.read()
+                    conversation = await self.repository.get_conversation_by_address(ph.address)
+                    conversation.add_message(PigeonHoleMessage(ph.address, payload, ph.public_key))
+                    await self.repository.save_conversation(conversation)
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
@@ -101,9 +107,6 @@ class DsnetApi:
             results = await self.index.search(msg.payload)
             if results:
                 await self.send_response(msg.public_key, b'\\'.join(results))
-
-    async def handle_message(self, msg: Message) -> None:
-        pass
 
 
 def main():
