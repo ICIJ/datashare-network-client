@@ -4,6 +4,7 @@ import databases
 import pytest
 import pytest_asyncio
 from dsnet.crypto import gen_key_pair
+from dsnet.message import Query
 from pytest_httpserver import HTTPServer
 from pytest_httpserver.httpserver import HandlerType
 from sqlalchemy import create_engine
@@ -11,6 +12,7 @@ from werkzeug import Response
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
+from dsnetclient.index import MemoryIndex
 from dsnetclient.models import metadata
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
@@ -60,3 +62,32 @@ async def test_send_response(httpserver: HTTPServer, connect_disconnect_db):
     conversations = await repository.get_conversations()
     assert len(conversations) == 1
     assert conversations[0].nb_sent_messages == 1
+
+
+@pytest.mark.asyncio
+async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    keys = gen_key_pair()
+    query_keys = gen_key_pair()
+    repository = SqlalchemyRepository(database)
+    api = DsnetApi(URL(httpserver.url_for('/')), repository, private_key=keys.private, index=MemoryIndex({'foo', 'bar'}))
+
+    await api.handle_query(Query(query_keys.public, b'foo'))
+
+    httpserver.check()
+    conversations = await repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].nb_sent_messages == 1\
+
+
+@pytest.mark.asyncio
+async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disconnect_db):
+    keys = gen_key_pair()
+    query_keys = gen_key_pair()
+    repository = SqlalchemyRepository(database)
+    api = DsnetApi(URL(httpserver.url_for('/')), repository, private_key=keys.private, index=MemoryIndex(set()))
+
+    await api.handle_query(Query(query_keys.public, b'foo'))
+
+    httpserver.check()
+    assert await repository.get_conversations() == []

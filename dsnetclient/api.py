@@ -11,14 +11,16 @@ from dsnet.message import Message, MessageType
 from sqlalchemy import create_engine
 from yarl import URL
 
+from dsnetclient.index import Index
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, private_key: bytes, reconnect_delay_seconds=2) -> None:
+    def __init__(self, url: URL, repository: Repository, private_key: bytes, reconnect_delay_seconds=2, index: Index = None) -> None:
         self.repository = repository
         self.base_url = url
+        self.index = index
         self.private_key = private_key
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
@@ -57,6 +59,7 @@ class DsnetApi:
 
     async def start_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                               decoder: Callable[[bytes], Message] = MessageType.loads):
+        callback = self.websocket_callback if notification_cb is None else notification_cb
         while not self.stop:
             self.ws = None
             try:
@@ -64,18 +67,40 @@ class DsnetApi:
                     async with session.ws_connect(self.base_url.join(URL('/notifications'))) as self.ws:
                         async for msg in self.ws:
                             if msg.type == WSMsgType.BINARY:
-                                await notification_cb(decoder(msg.data))
+                                await callback(decoder(msg.data))
                             elif msg.type == WSMsgType.TEXT:
-                                await notification_cb(decoder(msg.data.encode()))
+                                await callback(decoder(msg.data.encode()))
                             else:
                                 logging.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:
-                logging.warning(f"client connection waiting {self.reconnect_delay_seconds} before reconnect")
+                logging.warning(f"ws connection lost waiting {self.reconnect_delay_seconds}s "
+                                f"before reconnect to {self.base_url.join(URL('/notifications'))}")
                 await asyncio.sleep(self.reconnect_delay_seconds)
 
     def background_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                              decoder: Callable[[bytes], Message] = MessageType.loads) -> Task:
         return asyncio.get_event_loop().create_task(self.start_listening(notification_cb, decoder))
+
+    async def websocket_callback(self, message: Message) -> None:
+        if message.type() == MessageType.NOTIFICATION:
+            await self.handle_ph_notification(message)
+        elif message.type() == MessageType.QUERY:
+            await self.handle_query(message)
+        elif message.type() == MessageType.MESSAGE:
+            await self.handle_message(message)
+        else:
+            logging.warning(f"received unhandled type {message.type()}")
+
+    async def handle_ph_notification(self, msg: Message) -> None:
+        pass
+
+    async def handle_query(self, msg: Query) -> None:
+        results = await self.index.search(msg.payload)
+        if results:
+            await self.send_response(msg.public_key, b'\\'.join(results))
+
+    async def handle_message(self, msg: Message) -> None:
+        pass
 
 
 def main():
@@ -84,7 +109,7 @@ def main():
     engine = create_engine(url)
     metadata.create_all(engine)
     repository = SqlalchemyRepository(databases.Database(url))
-    api = DsnetApi(URL('http://localhost:8000'), repository)
+    api = DsnetApi(URL('http://localhost:8000'), repository, )
 
     async def cb(payload: bytes):
         print(payload)
