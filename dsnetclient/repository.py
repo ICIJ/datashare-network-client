@@ -1,6 +1,6 @@
 import abc
 from collections import defaultdict
-from typing import List, Mapping
+from typing import List, Mapping, Optional
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
@@ -29,7 +29,7 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def get_conversation_by_key(self, conversation_pub_key: bytes) -> Conversation:
+    async def get_conversation_by_key(self, conversation_pub_key: bytes) -> Optional[Conversation]:
         """
         Gets a conversation by its public key
 
@@ -38,7 +38,7 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def get_conversation_by_address(self, address: bytes) -> Conversation:
+    async def get_conversation_by_address(self, address: bytes) -> Optional[Conversation]:
         """
         Gets a conversation by ph address
 
@@ -153,18 +153,22 @@ class SqlalchemyRepository(Repository):
                                             message_number=message_number)
         await self.database.execute(stmt)
 
-    async def get_conversation_by_key(self, public_key) -> Conversation:
+    async def get_conversation_by_key(self, public_key) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(conversation_table.c.public_key == public_key)
-        return (await self.get_conversations(stmt))[0]
+        return await self.get_one_conversation(stmt)
 
-    async def get_conversation_by_address(self, address) -> Conversation:
+    async def get_conversation_by_address(self, address) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(pigeonhole_table.c.address == address)
-        return (await self.get_conversations(stmt))[0]
+        return await self.get_one_conversation(stmt)
 
     async def get_conversations_filter_by(self, **kwargs) -> List[Conversation]:
         clauses = [column(key) == value for key, value in kwargs.items()]
         stmt = self._create_conversation_statement().where(*clauses)
         return await self.get_conversations(stmt)
+
+    async def get_one_conversation(self, stmt) -> Optional[Conversation]:
+        convs = await self.get_conversations(stmt)
+        return convs[0] if convs else None
 
     async def get_conversations(self, statement=None) -> List[Conversation]:
         stmt = self._create_conversation_statement() if statement is None else statement

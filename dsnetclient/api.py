@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from asyncio import Task
 from typing import Awaitable, Callable
 
@@ -12,6 +11,7 @@ from sqlalchemy import create_engine
 from yarl import URL
 
 from dsnetclient.index import Index
+from dsnetclient.logger import logger
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -71,9 +71,9 @@ class DsnetApi:
                             elif msg.type == WSMsgType.TEXT:
                                 await callback(decoder(msg.data.encode()))
                             else:
-                                logging.warning(f"received unhandled type {msg.type}")
+                                logger.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:
-                logging.warning(f"ws connection lost waiting {self.reconnect_delay_seconds}s "
+                logger.warning(f"ws connection lost waiting {self.reconnect_delay_seconds}s "
                                 f"before reconnect to {self.base_url.join(URL('/notifications'))}")
                 await asyncio.sleep(self.reconnect_delay_seconds)
 
@@ -89,15 +89,18 @@ class DsnetApi:
         elif message.type() == MessageType.MESSAGE:
             await self.handle_message(message)
         else:
-            logging.warning(f"received unhandled type {message.type()}")
+            logger.warning(f"received unhandled type {message.type()}")
 
     async def handle_ph_notification(self, msg: Message) -> None:
         pass
 
     async def handle_query(self, msg: Query) -> None:
-        results = await self.index.search(msg.payload)
-        if results:
-            await self.send_response(msg.public_key, b'\\'.join(results))
+        logger.info(f"received query {msg.public_key.hex()}")
+        local_query = await self.repository.get_conversation_by_key(msg.public_key)
+        if local_query is None:
+            results = await self.index.search(msg.payload)
+            if results:
+                await self.send_response(msg.public_key, b'\\'.join(results))
 
     async def handle_message(self, msg: Message) -> None:
         pass

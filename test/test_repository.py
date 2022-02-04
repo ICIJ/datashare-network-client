@@ -115,6 +115,16 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
+async def test_get_conversation_by_key_no_records(connect_disconnect_db):
+    assert await SqlalchemyRepository(database).get_conversation_by_key(b'unknown') is None
+
+
+@pytest.mark.asyncio
+async def test_get_conversation_by_address_no_records(connect_disconnect_db):
+    assert await SqlalchemyRepository(database).get_conversation_by_address(b'unknown') is None
+
+
+@pytest.mark.asyncio
 async def test_get_conversation_by_address(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
