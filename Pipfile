@@ -4,13 +4,13 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = '==0.4.0'
+datashare-network-core = '==0.5.1'
 aiohttp = '*'
 
 [dev-packages]
 pytest-httpserver = "*"
 alembic = "*"
-datashare-network-server = "==0.3.0"
+datashare-network-server = "==0.4.0"
 uvicorn = {extras = ["standard"], version = "*"}
 pytest = '*'
 pytest-asyncio = '*'

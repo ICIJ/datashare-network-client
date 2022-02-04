@@ -5,7 +5,7 @@ import databases
 import dsnetserver
 import pytest
 import pytest_asyncio
-from dsnet.core import Query, MessageType
+from dsnet.message import Query, MessageType, Message
 from dsnet.crypto import gen_key_pair
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
@@ -56,10 +56,10 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 
     cb_called = Event()
 
-    async def cb(payload: bytes) -> None:
-        assert payload is not None
-        assert payload[0] == 1
-        assert payload[-len(b'payload_value'):] == b'payload_value'
+    async def cb(message: Message) -> None:
+        assert message is not None
+        assert message.type() == MessageType.QUERY
+        assert message.payload == b'payload_value'
         cb_called.set()
 
     api = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys.private)
@@ -95,7 +95,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
 
     cb_called = Event()
 
-    async def cb(payload: bytes) -> None:
+    async def cb(payload: Message) -> None:
         assert payload is not None
         cb_called.set()
 
@@ -124,16 +124,15 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     api_alice = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys_alice.private)
     api_bob = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys_bob.private)
 
-    async def cb_alice(payload):
-        if payload[0] == MessageType.NOTIFICATION:
+    async def cb_alice(message: Message):
+        if message.type() == MessageType.NOTIFICATION:
             convs = await repository.get_conversations_filter_by(querier=True)
             assert len(convs) == 1
-            assert payload[1:4] == convs[0].last_address[0:3]
+            assert message.adr_hex == convs[0].last_address[0:3]
 
-    async def cb_bob(payload):
-        if payload[0] == MessageType.QUERY:
-            query = Query.from_bytes(payload)
-            await api_bob.send_response(query.public_key, b"response payload")
+    async def cb_bob(message: Message):
+        if message.type() == MessageType.QUERY:
+            await api_bob.send_response(message.public_key, b"response payload")
 
     task_alice = api_alice.background_listening(cb_alice)
     task_bob = api_bob.background_listening(cb_bob)

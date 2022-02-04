@@ -4,8 +4,10 @@ from sqlite3 import IntegrityError
 import databases
 import pytest
 import pytest_asyncio
-from dsnet.core import PigeonHole, Conversation, Message
+from dsnet.core import PigeonHole, Conversation
+
 from dsnet.crypto import gen_key_pair
+from dsnet.message import PigeonHoleMessage
 from sqlalchemy import create_engine
 
 from dsnetclient.models import metadata
@@ -101,10 +103,10 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
     conversation = Conversation.create_from_querier(query_keys.private, alicia_keys.public, query=b'Pop')
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message1 = ph.encrypt(b'alicia response1')
-    conversation.add_message(Message(conversation.last_address, encrypted_message1, alicia_keys.public))
+    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message1, alicia_keys.public))
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message2 = ph.encrypt(b'alicia response2')
-    conversation.add_message(Message(conversation.last_address, encrypted_message2, alicia_keys.public))
+    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message2, alicia_keys.public))
 
     await repository.save_conversation(conversation)
 

@@ -3,7 +3,8 @@ from collections import defaultdict
 from typing import List, Mapping
 
 from databases import Database
-from dsnet.core import Conversation, PigeonHole, Message
+from dsnet.core import Conversation, PigeonHole
+from dsnet.message import PigeonHoleMessage
 from sqlalchemy import insert, select, column
 from sqlalchemy.sql import Select
 
@@ -143,7 +144,7 @@ class SqlalchemyRepository(Repository):
             for i, msg in enumerate(conversation._messages):
                 await self.save_message(msg, conversation_id, i)
 
-    async def save_message(self, message: Message, conversation_id: int, message_number: int) -> None:
+    async def save_message(self, message: PigeonHoleMessage, conversation_id: int, message_number: int) -> None:
         stmt = insert(message_table).values(address=message.address,
                                             from_key=message.from_key,
                                             payload=message.payload,
@@ -182,7 +183,7 @@ class SqlalchemyRepository(Repository):
                                                     row['querier'], row['created_at'], row['query'])
             ph_dict[row['id']][row['address']] = PigeonHole(public_key_for_dh=row['public_key_1'], message_number=row['message_number'],
                            dh_key=row['dh_key'])
-            messages_dict[row['id']][row['address_1']] = Message(address=row['address_1'], payload=row['payload'], from_key=row['from_key'], timestamp=row['timestamp'])
+            messages_dict[row['id']][row['address_1']] = PigeonHoleMessage(address=row['address_1'], payload=row['payload'], from_key=row['from_key'], timestamp=row['timestamp'])
         return [Conversation(c.private_key, c.other_public_key, c.nb_sent_messages, c.nb_recv_messages, c.querier, c.created_at, c.query, pigeonholes=list(ph_dict[id].values()), messages=list(messages_dict[id].values())) for id, c in conversations.items()]
 
     async def peers(self) -> List[Peer]:
