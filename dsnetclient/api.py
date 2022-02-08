@@ -74,8 +74,10 @@ class DsnetApi:
                                 logger.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:
                 logger.warning(f"ws connection lost waiting {self.reconnect_delay_seconds}s "
-                                f"before reconnect to {self.base_url.join(URL('/notifications'))}")
+                               f"before reconnect to {self.base_url.join(URL('/notifications'))}")
                 await asyncio.sleep(self.reconnect_delay_seconds)
+            except Exception as e:
+                logger.error(e)
 
     def background_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                              decoder: Callable[[bytes], Message] = MessageType.loads) -> Task:

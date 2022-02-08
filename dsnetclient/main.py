@@ -45,17 +45,21 @@ class Demo(cmd.Cmd):
         asyncio.get_event_loop().run_until_complete(self.api.send_query(line.encode()))
         return False
 
-    def do_list_queries(self, _line: str) -> Optional[bool]:
+    def do_queries(self, _line: str) -> Optional[bool]:
         conversations = asyncio.get_event_loop().run_until_complete(self.api.repository.get_conversations())
         for conversation in conversations:
             query = conversation.query.decode() if conversation.query else ""
-            print(f"{conversation.id}. {query}")
+            print(f"{conversation.id}: {query} for {conversation.other_public_key.hex()}")
         return False
 
     def do_messages(self, line: str) -> Optional[bool]:
-        conversation = asyncio.get_event_loop().run_until_complete(self.api.repository.get_conversations_filter_by(id=int(line)))
-        for msg in conversation._messages:
-            print(f"{msg.address.hex()} ({msg.timestamp}): {msg.payload}")
+        conv = asyncio.get_event_loop().run_until_complete(self.api.repository.get_conversation(int(line)))
+        if conv is not None:
+            for msg in conv._messages:
+                address = msg.address if msg.address is not None else 'query'
+                print(f"{address} ({msg.timestamp}): {msg.payload}")
+        else:
+            print('no such conversation id')
         return False
 
     def do_bye(self, line):
