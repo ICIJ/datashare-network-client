@@ -13,7 +13,6 @@ from dsnetclient.api import DsnetApi
 from dsnetclient.index import MemoryIndex
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
-DB_URL = 'sqlite:///dsnet.db'
 
 class Demo(cmd.Cmd):
     def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], my_entities: Set[str]):
@@ -26,6 +25,7 @@ class Demo(cmd.Cmd):
         self._listener = self.api.background_listening(self.display_message)
         self.my_entities = my_entities
         self.keys: List[bytes] = list()
+        self.prompt = 'DS> '
         for key_hex in keys:
             key = bytes.fromhex(key_hex)
             if private_key != self.public_key:
@@ -50,6 +50,7 @@ class Demo(cmd.Cmd):
         for conversation in conversations:
             query = conversation.query.decode() if conversation.query else ""
             print(f"{conversation.id}. {query}")
+        return False
 
     def do_messages(self, line: str) -> Optional[bool]:
         conversation = asyncio.get_event_loop().run_until_complete(self.api.repository.get_conversations_filter_by(id=int(line)))
@@ -102,7 +103,7 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--private-key', prompt='User private key', help='Private key file (prefix with @)')
 @click.option('--database-url', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
 @click.option('--keys', prompt='Others\' key', help='Path to file containing keys (one key per line)')
-@click.option('--entities-file', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
+@click.option('--entities-file', prompt='Entities file', help='Entities files (one per line)')
 def shell(server_url, private_key, database_url, keys, entities_file):
     with open(private_key, "r") as f:
         private_key_content = f.read()
@@ -113,7 +114,7 @@ def shell(server_url, private_key, database_url, keys, entities_file):
     with open(entities_file, "r") as f:
         my_entities = f.readlines()
 
-    Demo(server_url, private_key_content, database_url, keys_list, set(my_entities)).cmdloop()
+    Demo(URL(server_url), private_key_content, database_url, keys_list, set(my_entities)).cmdloop()
 
 
 if __name__ == '__main__':
