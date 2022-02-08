@@ -52,7 +52,8 @@ async def test_get_pigeonhole_by_adr(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
 
     await repository.save_pigeonhole(ph, 123)
-    phs = await repository.get_pigeonholes_by_adr(bytes.fromhex(PigeonHoleNotification.from_address(ph.address).adr_hex))
+    await repository.save_pigeonhole(PigeonHole(gen_key_pair().public, bob_keys.private, bob_keys.public), 123)
+    phs = await repository.get_pigeonholes_by_adr(PigeonHoleNotification.from_address(ph.address).adr_hex)
 
     assert len(phs) == 1
     assert phs[0].address == ph.address

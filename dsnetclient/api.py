@@ -92,7 +92,7 @@ class DsnetApi:
     async def handle_ph_notification(self, msg: PigeonHoleNotification) -> None:
         logger.info(f"received ph notification for {msg.adr_hex}")
         async with ClientSession() as session:
-            for ph in await self.repository.get_pigeonholes_by_adr(bytes.fromhex(msg.adr_hex)):
+            for ph in await self.repository.get_pigeonholes_by_adr(msg.adr_hex):
                 async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
                     http_response.raise_for_status()
                     message = PigeonHoleMessage.from_bytes(await http_response.read())

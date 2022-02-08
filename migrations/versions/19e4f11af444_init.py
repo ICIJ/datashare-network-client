@@ -49,6 +49,7 @@ def upgrade():
     op.create_index(op.f('ix_message_from_key'), 'message', ['from_key'], unique=False)
     op.create_table('pigeonhole',
     sa.Column('address', sa.LargeBinary(), nullable=False),
+    sa.Column('adr_hex', sa.String(8), nullable=False, index=True),
     sa.Column('dh_key', sa.LargeBinary(), nullable=False),
     sa.Column('public_key', sa.LargeBinary(), nullable=False),
     sa.Column('message_number', sa.Integer(), nullable=False),

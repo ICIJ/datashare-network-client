@@ -4,7 +4,7 @@ from typing import List, Mapping, Optional
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
-from dsnet.message import PigeonHoleMessage
+from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from sqlalchemy import insert, select, column
 from sqlalchemy.sql import Select
 
@@ -106,7 +106,7 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def get_pigeonholes_by_adr(self, adr: bytes) -> List[PigeonHole]:
+    async def get_pigeonholes_by_adr(self, adr: str) -> List[PigeonHole]:
         """
         get the list of pigeonholes beginning with adr
 
@@ -127,9 +127,9 @@ class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
 
-    async def get_pigeonholes_by_adr(self, adr: bytes) -> List[PigeonHole]:
+    async def get_pigeonholes_by_adr(self, adr_hex: str) -> List[PigeonHole]:
         # stmt = pigeonhole_table.select().where(pigeonhole_table.c.address.like(adr+b'%')) TODO make that work
-        stmt = pigeonhole_table.select()
+        stmt = pigeonhole_table.select().where(pigeonhole_table.c.adr_hex == adr_hex)
         rows = await self.database.fetch_all(stmt)
         return [
             PigeonHole(
@@ -156,6 +156,7 @@ class SqlalchemyRepository(Repository):
     async def save_pigeonhole(self, pigeonhole: PigeonHole, conversation_id: int) -> None:
         await self.database.execute(insert(pigeonhole_table).values(
             address=pigeonhole.address,
+            adr_hex=PigeonHoleNotification.from_address(pigeonhole.address).adr_hex,
             dh_key=pigeonhole.dh_key,
             public_key=pigeonhole.public_key,
             message_number=pigeonhole.message_number,
