@@ -221,3 +221,12 @@ async def test_save_get_peers(connect_disconnect_db):
     assert len(actual_peers) == 1
     assert actual_peers[0].public_key == peer_keys.public
 
+
+@pytest.mark.asyncio
+async def test_save_peers_twice(connect_disconnect_db):
+    peer_keys = gen_key_pair()
+    repository = SqlalchemyRepository(database)
+    await repository.save_peer(Peer(peer_keys.public))
+    await repository.save_peer(Peer(peer_keys.public))
+    assert len(await repository.peers()) == 1
+

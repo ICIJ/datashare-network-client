@@ -49,15 +49,6 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def get_conversation_by_address(self, address: bytes) -> Optional[Conversation]:
-        """
-        Gets a conversation by ph address
-
-        :param address: last pigeon hole address linked to conversation
-        :return: Retrieved conversation
-        """
-
-    @abc.abstractmethod
     async def save_conversation(self, conversation: Conversation) -> None:
         """
         Saves a response address to a query.
@@ -288,4 +279,7 @@ class SqlalchemyRepository(Repository):
         return [Peer(**peer) for peer in await self.database.fetch_all(stmt)]
 
     async def save_peer(self, peer: Peer):
-        await self.database.execute(insert(peer_table).values(public_key=peer.public_key))
+        try:
+            await self.database.execute(insert(peer_table).values(public_key=peer.public_key))
+        except sqlite3.IntegrityError:
+            logger.debug("Attempted to save an existing peer")

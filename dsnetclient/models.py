@@ -8,7 +8,7 @@ peer_table = Table(
     "peer",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("public_key", LargeBinary, index=True, nullable=False)
+    Column("public_key", LargeBinary, unique=True, index=True, nullable=False)
 )
 
 
