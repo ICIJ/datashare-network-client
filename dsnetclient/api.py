@@ -95,10 +95,9 @@ class DsnetApi:
             for ph in await self.repository.get_pigeonholes_by_adr(bytes.fromhex(msg.adr_hex)):
                 async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
                     http_response.raise_for_status()
-                    payload = await http_response.read()
-                    conversation = await self.repository.get_conversation_by_address(ph.address)
-                    conversation.add_message(PigeonHoleMessage(ph.address, payload, ph.public_key))
-                    await self.repository.save_conversation(conversation)
+                    message = PigeonHoleMessage.from_bytes(await http_response.read())
+                    message.from_key = ph.peer_key
+                    await self.repository.save_message(message, ph)
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")

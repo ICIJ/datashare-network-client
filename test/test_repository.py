@@ -87,8 +87,6 @@ async def test_save_conversation(connect_disconnect_db):
     query_keys = gen_key_pair()
     bob_keys = gen_key_pair()
     conversation = Conversation.create_from_querier(query_keys.private, bob_keys.public, query=b'France')
-    conversation.nb_sent_messages = 12
-    conversation.nb_recv_messages = 9
     conversation.created_at = datetime(2022, 1, 2, 3, 4, 5)
 
     repository = SqlalchemyRepository(database)
@@ -103,8 +101,6 @@ async def test_save_conversation(connect_disconnect_db):
     assert actual_conversation.query == conversation.query
     assert actual_conversation.is_receiving(conversation.last_address)
     assert actual_conversation.created_at == conversation.created_at
-    assert actual_conversation.nb_sent_messages == conversation.nb_sent_messages
-    assert actual_conversation.nb_recv_messages == conversation.nb_recv_messages
     assert await repository.get_pigeonhole(actual_conversation.last_address) is not None
 
 
@@ -125,7 +121,8 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
     await repository.save_conversation(conversation)
 
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
-    assert len(actual_conversation._messages) == 2
+    assert actual_conversation.nb_recv_messages == 2
+    assert actual_conversation.nb_sent_messages == 1
 
 
 @pytest.mark.asyncio
@@ -193,7 +190,7 @@ async def test_get_conversations_with_messages(connect_disconnect_db):
     assert len(conversations) == 1
     assert conversations[0].query == b'Hello'
     assert len(conversations[0]._pigeonholes) == 2
-    assert len(conversations[0]._messages) == 1
+    assert len(conversations[0]._messages) == 2
     assert conversations[0].last_message.payload == b'Hi'
 
 
@@ -206,3 +203,22 @@ async def test_save_get_peers(connect_disconnect_db):
     actual_peers = await repository.peers()
     assert len(actual_peers) == 1
     assert actual_peers[0].public_key == peer_keys.public
+
+
+@pytest.mark.asyncio
+async def test_save_message_with_pigeonhole(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    recv_keys = gen_key_pair()
+    conversation = Conversation.create_from_querier(query_keys.private, recv_keys.public, query=b'Hello')
+    repository = SqlalchemyRepository(database)
+
+    await repository.save_conversation(conversation)
+
+    conversation_db = (await repository.get_conversations())[0]
+    ph = conversation_db.pigeonhole_for_address(conversation_db.last_address)
+
+    await repository.save_message(PigeonHoleMessage(conversation.last_address, b'payload', recv_keys.public, conversation_id=1), ph)
+
+    conversation_db = (await repository.get_conversations())[0]
+
+    assert conversation_db.last_message.payload == b'payload'

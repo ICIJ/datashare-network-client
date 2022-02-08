@@ -100,19 +100,22 @@ async def test_receive_ph_notification_no_listening_address(httpserver: HTTPServ
     await api.handle_ph_notification(PigeonHoleNotification('beef')) # if server is called it will break
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_receive_ph_notification_with_matching_address(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver)
     await api.send_query(b'query')
     conv = (await api.repository.get_conversations())[0]
-    msg = PigeonHoleMessage(conv.last_address, b'response encrypted', gen_key_pair().public)
-    httpserver.expect_request(re.compile(f"/ph/{conv.last_address.hex()}"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200, response=msg.to_bytes()))
+    msg = PigeonHoleMessage(conv.last_address, conv.pigeonhole_for_address(conv.last_address).encrypt(b'response'), gen_key_pair().public)
+    httpserver.expect_request(re.compile(f"/ph/{conv.last_address.hex()}"), method='GET', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200, response=msg.to_bytes(), content_type='application/octet-stream'))
 
     await api.handle_ph_notification(PigeonHoleNotification.from_address(conv.last_address))
 
     httpserver.check()
+    conversations = await api.repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].nb_sent_messages == 1
+    assert conversations[0].nb_recv_messages == 1
 
 
 async def create_api(httpserver, index = None):

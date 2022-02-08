@@ -114,6 +114,14 @@ class Repository(metaclass=abc.ABCMeta):
         :return: list of matching pigeonholes
         """
 
+    @abc.abstractmethod
+    async def save_message(self, message: PigeonHoleMessage, ph: PigeonHole) -> None:
+        """
+        Save a message in a conversation
+        :param message: message to save
+        :param ph: pigeonhole in which to save the message
+        """
+
 
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
@@ -123,21 +131,38 @@ class SqlalchemyRepository(Repository):
         # stmt = pigeonhole_table.select().where(pigeonhole_table.c.address.like(adr+b'%')) TODO make that work
         stmt = pigeonhole_table.select()
         rows = await self.database.fetch_all(stmt)
-        return [PigeonHole(public_key_for_dh=row['public_key'], message_number=row['message_number'], dh_key=row['dh_key']) for row in rows]
+        return [
+            PigeonHole(
+                public_key_for_dh=row['public_key'],
+                message_number=row['message_number'],
+                dh_key=row['dh_key'],
+                conversation_id=row['conversation_id'],
+                peer_key=row['peer_key'],
+            )
+            for row in rows
+        ]
 
     async def get_pigeonhole(self, address: bytes) -> PigeonHole:
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.address == address)
         row = await self.database.fetch_one(stmt)
-        return PigeonHole(public_key_for_dh=row['public_key'],
-                          message_number=row['message_number'],
-                          dh_key=row['dh_key']) if row is not None else None
+        return PigeonHole(
+            public_key_for_dh=row['public_key'],
+            message_number=row['message_number'],
+            dh_key=row['dh_key'],
+            conversation_id=row['conversation_id'],
+            peer_key=row['peer_key'],
+        ) if row is not None else None
 
     async def save_pigeonhole(self, pigeonhole: PigeonHole, conversation_id: int) -> None:
-        await self.database.execute(insert(pigeonhole_table).values(address=pigeonhole.address,
-                                                                    dh_key=pigeonhole.dh_key,
-                                                                    public_key=pigeonhole.public_key,
-                                                                    message_number=pigeonhole.message_number,
-                                                                    conversation_id=conversation_id))
+        await self.database.execute(insert(pigeonhole_table).values(
+            address=pigeonhole.address,
+            dh_key=pigeonhole.dh_key,
+            public_key=pigeonhole.public_key,
+            message_number=pigeonhole.message_number,
+            peer_key=pigeonhole.peer_key,
+            conversation_id=conversation_id
+            )
+        )
 
     async def delete_pigeonhole(self, address: bytes) -> bool:
         return await self.database.execute(pigeonhole_table.delete().where(pigeonhole_table.c.address == address)) > 0
@@ -145,28 +170,33 @@ class SqlalchemyRepository(Repository):
     async def save_conversation(self, conversation: Conversation) -> None:
         async with self.database.transaction():
             conversation_id = await self.database.execute(
-                insert(conversation_table).values(private_key=conversation.private_key,
-                                                  public_key=conversation.public_key,
-                                                  other_public_key=conversation.other_public_key,
-                                                  nb_sent_messages=conversation.nb_sent_messages,
-                                                  nb_recv_messages=conversation.nb_recv_messages,
-                                                  querier=conversation.querier,
-                                                  created_at=conversation.created_at,
-                                                  query=conversation.query))
+                insert(conversation_table).values(
+                    private_key=conversation.private_key,
+                    public_key=conversation.public_key,
+                    other_public_key=conversation.other_public_key,
+                    querier=conversation.querier,
+                    created_at=conversation.created_at,
+                    query=conversation.query
+                )
+            )
             for ph in conversation._pigeonholes.values():
                 await self.save_pigeonhole(ph, conversation_id)
 
-            for i, msg in enumerate(conversation._messages):
-                await self.save_message(msg, conversation_id, i)
+            for msg in conversation._messages:
+                await self._save_message(msg, conversation_id)
 
-    async def save_message(self, message: PigeonHoleMessage, conversation_id: int, message_number: int) -> None:
-        stmt = insert(message_table).values(address=message.address,
-                                            from_key=message.from_key,
-                                            payload=message.payload,
-                                            timestamp=message.timestamp,
-                                            conversation_id=conversation_id,
-                                            message_number=message_number)
+    async def _save_message(self, message: PigeonHoleMessage, conversation_id: int) -> None:
+        stmt = insert(message_table).values(
+            address=message.address,
+            from_key=message.from_key,
+            payload=message.payload,
+            timestamp=message.timestamp,
+            conversation_id=conversation_id
+        )
         await self.database.execute(stmt)
+
+    async def save_message(self, message: PigeonHoleMessage, ph: PigeonHole) -> None:
+        await self._save_message(message, ph.conversation_id)
 
     async def get_conversation_by_key(self, public_key) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(conversation_table.c.public_key == public_key)
@@ -198,12 +228,38 @@ class SqlalchemyRepository(Repository):
         ph_dict = defaultdict(dict)
         conversations = dict()
         for row in conversation_maps:
-            conversations[row['id']] = Conversation(row['private_key'], row['other_public_key'], row['nb_sent_messages'], row['nb_recv_messages'],
-                                                    row['querier'], row['created_at'], row['query'])
-            ph_dict[row['id']][row['address']] = PigeonHole(public_key_for_dh=row['public_key_1'], message_number=row['message_number'],
-                           dh_key=row['dh_key'])
-            messages_dict[row['id']][row['address_1']] = PigeonHoleMessage(address=row['address_1'], payload=row['payload'], from_key=row['from_key'], timestamp=row['timestamp'])
-        return [Conversation(c.private_key, c.other_public_key, c.nb_sent_messages, c.nb_recv_messages, c.querier, c.created_at, c.query, pigeonholes=list(ph_dict[id].values()), messages=list(messages_dict[id].values())) for id, c in conversations.items()]
+            conversations[row['id']] = Conversation(
+                row['private_key'],
+                row['other_public_key'],
+                row['querier'],
+                row['created_at'],
+                row['query']
+            )
+            ph_dict[row['id']][row['address']] = PigeonHole(
+                public_key_for_dh=row['public_key_1'],
+                message_number=row['message_number'],
+                dh_key=row['dh_key'],
+                conversation_id=row['id'],
+                peer_key=row['peer_key']
+            )
+            messages_dict[row['id']][row['address_1']] = PigeonHoleMessage(
+                address=row['address_1'],
+                payload=row['payload'],
+                from_key=row['from_key'],
+                timestamp=row['timestamp'],
+                conversation_id=row['id']
+            )
+        return [
+            Conversation(
+                c.private_key,
+                c.other_public_key,
+                c.querier,
+                c.created_at,
+                c.query,
+                pigeonholes=list(ph_dict[id].values()),
+                messages=list(messages_dict[id].values()))
+            for id, c in conversations.items()
+        ]
 
     async def peers(self) -> List[Peer]:
         stmt = peer_table.select()
