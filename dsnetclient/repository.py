@@ -31,6 +31,15 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
+    async def get_conversation(self, id: int) -> Optional[Conversation]:
+        """
+        Get database conversation list filtered by some Conversation properties
+
+        :param id: conversation id
+        :return: Conversation if found
+        """
+
+    @abc.abstractmethod
     async def get_conversation_by_key(self, conversation_pub_key: bytes) -> Optional[Conversation]:
         """
         Gets a conversation by its public key
@@ -120,6 +129,10 @@ class Repository(metaclass=abc.ABCMeta):
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
+
+    async def get_conversation(self, id: int) -> Optional[Conversation]:
+        stmt = self._create_conversation_statement().where(conversation_table.c.id == id)
+        return await self.get_one_conversation(stmt)
 
     async def get_pigeonholes_by_adr(self, adr_hex: str) -> List[PigeonHole]:
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.adr_hex == adr_hex)

@@ -162,6 +162,17 @@ async def test_get_conversations(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
+async def test_get_conversation_buy_id(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    await repository.save_conversation(conversation)
+
+    assert await repository.get_conversation(1) is not None
+
+
+@pytest.mark.asyncio
 async def test_get_conversations_filter_by_properties(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
