@@ -49,6 +49,15 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
+    async def get_conversation_by_address(self, address: bytes) -> Optional[Conversation]:
+        """
+        Gets a conversation by ph address
+
+        :param address: last pigeon hole address linked to conversation
+        :return: Retrieved conversation
+        """
+
+    @abc.abstractmethod
     async def save_conversation(self, conversation: Conversation) -> None:
         """
         Saves a response address to a query.

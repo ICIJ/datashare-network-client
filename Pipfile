@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 datashare-network-core = '==0.8.0'
 aiohttp = '*'
+click = '*'
 
 [dev-packages]
 pytest-httpserver = "*"

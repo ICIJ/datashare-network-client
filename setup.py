@@ -32,5 +32,9 @@ setup(name='datashare-network-client',
           "Operating System :: OS Independent",
           "Topic :: Security :: Cryptography"
       ],
+      entry_points='''
+        [console_scripts]
+        dsnetclient=dsnetclient.main:cli
+        ''',
       python_requires='>=3.6',
       )
