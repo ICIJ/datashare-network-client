@@ -1,11 +1,9 @@
 from datetime import datetime
-from sqlite3 import IntegrityError
 
 import databases
 import pytest
 import pytest_asyncio
 from dsnet.core import PigeonHole, Conversation
-
 from dsnet.crypto import gen_key_pair
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from sqlalchemy import create_engine
@@ -60,15 +58,15 @@ async def test_get_pigeonhole_by_adr(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
-async def test_save_pigeonhole_twice(connect_disconnect_db):
+async def test_save_pigeonhole_idempotency(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
     ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
     await repository.save_pigeonhole(ph, 123)
-    with pytest.raises(IntegrityError):
-        await repository.save_pigeonhole(ph, 123)
+    await repository.save_pigeonhole(ph, 123)
+    assert await repository.get_pigeonhole(ph.address) is not None
 
 
 @pytest.mark.asyncio
@@ -190,9 +188,27 @@ async def test_get_conversations_with_messages(connect_disconnect_db):
     conversations = await repository.get_conversations()
     assert len(conversations) == 1
     assert conversations[0].query == b'Hello'
-    assert len(conversations[0]._pigeonholes) == 2
+    assert len(conversations[0]._pigeonholes) == 1
     assert len(conversations[0]._messages) == 2
     assert conversations[0].last_message.payload == b'Hi'
+
+
+@pytest.mark.asyncio
+async def test_save_conversation_deletes_old_pigeonholes(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+    carol_side = Conversation.create_from_recipient(carol_keys.private, query_keys.public)
+    querier_side = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    await repository.save_conversation(querier_side)
+    querier_side = (await repository.get_conversations())[0]
+    querier_side.add_message(carol_side.create_response(b"Hi"))
+
+    await repository.save_conversation(querier_side)
+
+    conversations = await repository.get_conversations()
+    assert len(conversations) == 1
+    assert len(conversations[0]._pigeonholes) == 1
 
 
 @pytest.mark.asyncio
@@ -205,21 +221,3 @@ async def test_save_get_peers(connect_disconnect_db):
     assert len(actual_peers) == 1
     assert actual_peers[0].public_key == peer_keys.public
 
-
-@pytest.mark.asyncio
-async def test_save_message_with_pigeonhole(connect_disconnect_db):
-    query_keys = gen_key_pair()
-    recv_keys = gen_key_pair()
-    conversation = Conversation.create_from_querier(query_keys.private, recv_keys.public, query=b'Hello')
-    repository = SqlalchemyRepository(database)
-
-    await repository.save_conversation(conversation)
-
-    conversation_db = (await repository.get_conversations())[0]
-    ph = conversation_db.pigeonhole_for_address(conversation_db.last_address)
-
-    await repository.save_message(PigeonHoleMessage(conversation.last_address, b'payload', recv_keys.public, conversation_id=1), ph)
-
-    conversation_db = (await repository.get_conversations())[0]
-
-    assert conversation_db.last_message.payload == b'payload'

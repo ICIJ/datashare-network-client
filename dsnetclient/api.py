@@ -6,12 +6,12 @@ import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair, get_public_key
+from dsnet.logger import logger
 from dsnet.message import Message, MessageType, PigeonHoleNotification, PigeonHoleMessage
 from sqlalchemy import create_engine
 from yarl import URL
 
 from dsnetclient.index import Index
-from dsnetclient.logger import logger
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -97,7 +97,9 @@ class DsnetApi:
                     http_response.raise_for_status()
                     message = PigeonHoleMessage.from_bytes(await http_response.read())
                     message.from_key = ph.peer_key if ph.peer_key is not None else ph.public_key
-                    await self.repository.save_message(message, ph)
+                    conversation = await self.repository.get_conversation_by_address(ph.address)
+                    conversation.add_message(message)
+                    await self.repository.save_conversation(conversation)
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
