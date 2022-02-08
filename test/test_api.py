@@ -101,7 +101,7 @@ async def test_receive_ph_notification_no_listening_address(httpserver: HTTPServ
 
 
 @pytest.mark.asyncio
-async def test_receive_ph_notification_with_matching_address(httpserver: HTTPServer, connect_disconnect_db):
+async def test_receive_ph_notification_with_matching_address_as_querier(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver)
     await api.send_query(b'query')
@@ -116,6 +116,25 @@ async def test_receive_ph_notification_with_matching_address(httpserver: HTTPSer
     assert len(conversations) == 1
     assert conversations[0].nb_sent_messages == 1
     assert conversations[0].nb_recv_messages == 1
+
+
+@pytest.mark.asyncio
+async def test_receive_ph_notification_with_matching_address_as_recipient(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    api = await create_api(httpserver)
+    query_keys = gen_key_pair()
+    await api.send_response(query_keys.public, b'response')
+    conv = (await api.repository.get_conversations())[0]
+    msg = PigeonHoleMessage(conv.last_address, conv.pigeonhole_for_address(conv.last_address).encrypt(b'response'), gen_key_pair().public)
+    httpserver.expect_request(re.compile(f"/ph/{conv.last_address.hex()}"), method='GET', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200, response=msg.to_bytes(), content_type='application/octet-stream'))
+
+    await api.handle_ph_notification(PigeonHoleNotification.from_address(conv.last_address))
+
+    httpserver.check()
+    conversations = await api.repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].nb_sent_messages == 1
+    assert conversations[0].nb_recv_messages == 2
 
 
 async def create_api(httpserver, index = None):

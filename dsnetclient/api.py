@@ -96,7 +96,7 @@ class DsnetApi:
                 async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
                     http_response.raise_for_status()
                     message = PigeonHoleMessage.from_bytes(await http_response.read())
-                    message.from_key = ph.peer_key
+                    message.from_key = ph.peer_key if ph.peer_key is not None else ph.public_key
                     await self.repository.save_message(message, ph)
 
     async def handle_query(self, msg: Query) -> None:

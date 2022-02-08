@@ -128,7 +128,6 @@ class SqlalchemyRepository(Repository):
         self.database = database
 
     async def get_pigeonholes_by_adr(self, adr_hex: str) -> List[PigeonHole]:
-        # stmt = pigeonhole_table.select().where(pigeonhole_table.c.address.like(adr+b'%')) TODO make that work
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.adr_hex == adr_hex)
         rows = await self.database.fetch_all(stmt)
         return [
