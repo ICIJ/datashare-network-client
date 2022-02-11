@@ -11,7 +11,7 @@ from dsnet.message import Message, MessageType, PigeonHoleNotification, PigeonHo
 from sqlalchemy import create_engine
 from yarl import URL
 
-from dsnetclient.index import Index
+from dsnetclient.index import Index, MemoryIndex
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -84,6 +84,7 @@ class DsnetApi:
         return asyncio.get_event_loop().create_task(self.start_listening(notification_cb, decoder))
 
     async def websocket_callback(self, message: Message) -> None:
+        logger.debug(f"received message type {message.type()}")
         if message.type() == MessageType.NOTIFICATION:
             await self.handle_ph_notification(message)
         elif message.type() == MessageType.QUERY:
@@ -114,16 +115,14 @@ class DsnetApi:
 
 def main():
     # for testing
+    keys = gen_key_pair()
     url = 'sqlite:///dsnet.db'
     engine = create_engine(url)
     metadata.create_all(engine)
     repository = SqlalchemyRepository(databases.Database(url))
-    api = DsnetApi(URL('http://localhost:8000'), repository, )
+    api = DsnetApi(URL('http://localhost:8000'), repository, keys.private, index=MemoryIndex({"foo", "bar"}))
 
-    async def cb(payload: bytes):
-        print(payload)
-
-    asyncio.get_event_loop().run_until_complete(api.start_listening(cb))
+    asyncio.get_event_loop().run_until_complete(api.start_listening())
 
 
 if __name__ == '__main__':
