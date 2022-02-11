@@ -95,6 +95,14 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
+    async def get_pigeonholes(self) -> List[PigeonHole]:
+        """
+        Listening pigeonholes
+
+        :return: pigeonhole list
+        """
+
+    @abc.abstractmethod
     async def get_conversations(self) -> List[Conversation]:
         """
         Get database conversation list
@@ -129,6 +137,16 @@ class Repository(metaclass=abc.ABCMeta):
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
+
+    async def get_pigeonholes(self) -> List[PigeonHole]:
+        return [
+            PigeonHole(
+                public_key_for_dh=row['public_key'],
+                message_number=row['message_number'],
+                dh_key=row['dh_key'],
+                conversation_id=row['conversation_id'],
+                peer_key=row['peer_key'],
+            ) for row in await self.database.fetch_all(pigeonhole_table.select())]
 
     async def get_conversation(self, id: int) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(conversation_table.c.id == id)
@@ -243,7 +261,8 @@ class SqlalchemyRepository(Repository):
         return self._merge_conversations(conversation_maps)
 
     def _create_conversation_statement(self) -> Select:
-        return select(conversation_table, pigeonhole_table, message_table).outerjoin(pigeonhole_table).join(message_table)
+        return select(conversation_table, pigeonhole_table, message_table).outerjoin(pigeonhole_table).join(
+            message_table)
 
     def _merge_conversations(self, conversation_maps: List[Mapping]) -> List[Conversation]:
         messages_dict = defaultdict(dict)

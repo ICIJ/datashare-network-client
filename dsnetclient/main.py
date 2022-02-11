@@ -49,14 +49,24 @@ class Demo(AsyncCmd):
             print(f"{conversation.id}: {query} for {conversation.other_public_key.hex()}")
         return False
 
+    async def do_phs(self, _line: str) -> Optional[bool]:
+        phs = await self.api.repository.get_pigeonholes()
+        for ph in phs:
+            print(f"{ph.address.hex()}: peer {ph.peer_key.hex()} nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
+        return False
+
     async def do_messages(self, line: str) -> Optional[bool]:
         conv = await self.api.repository.get_conversation(int(line))
         if conv is not None:
             for msg in conv._messages:
-                address = msg.address if msg.address is not None else 'query'
-                print(f"{address} ({msg.timestamp}): {msg.payload}")
+                address = msg.address.hex() if msg.address is not None else 'query'
+                print(f"{address} ({msg.timestamp}): {msg.payload} from {msg.from_key.hex()}")
         else:
             print('no such conversation id')
+        return False
+
+    async def do_pk(self, _) -> Optional[bool]:
+        print(self.public_key.hex())
         return False
 
     async def do_EOF(self, line):

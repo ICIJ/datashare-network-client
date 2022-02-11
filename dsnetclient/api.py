@@ -50,7 +50,7 @@ class DsnetApi:
         await self.repository.save_conversation(conv)
 
         async with ClientSession() as session:
-            async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.payload) as http_response:
+            async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.to_bytes()) as http_response:
                 http_response.raise_for_status()
 
     async def close(self):
@@ -101,6 +101,7 @@ class DsnetApi:
                     message = PigeonHoleMessage.from_bytes(await http_response.read())
                     message.from_key = ph.peer_key if ph.peer_key is not None else ph.public_key
                     conversation = await self.repository.get_conversation_by_address(ph.address)
+                    logger.debug(f"adding message {message.address.hex()} to conversation {conversation.id}")
                     conversation.add_message(message)
                     await self.repository.save_conversation(conversation)
 
