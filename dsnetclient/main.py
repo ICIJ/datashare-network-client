@@ -26,7 +26,7 @@ class Demo(AsyncCmd):
         self.api = DsnetApi(server_url, self.repository, private_key=self.private_key, index=MemoryIndex(my_entities))
         self._listener = self.api.background_listening()
         add_stdout_handler(level=logging.DEBUG)
-        self.prompt = 'DS> '
+        self.prompt = f'ds@{self.public_key[0:4].hex()}> '
         for key_hex in keys:
             key = bytes.fromhex(key_hex)
             if private_key != self.public_key:
