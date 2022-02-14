@@ -52,7 +52,13 @@ class Demo(AsyncCmd):
     async def do_phs(self, _line: str) -> Optional[bool]:
         phs = await self.api.repository.get_pigeonholes()
         for ph in phs:
-            print(f"{ph.address.hex()}: peer {ph.peer_key.hex()} nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
+            print(f"{ph.address.hex() if ph.address else ''}: peer {ph.peer_key.hex() if ph.peer_key else '?'} nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
+        return False
+
+    async def do_peers(self, _line: str) -> Optional[bool]:
+        peers = await self.api.repository.peers()
+        for peer in peers:
+            print(f"{peer.id}: {peer.public_key.hex()}")
         return False
 
     async def do_messages(self, line: str) -> Optional[bool]:
