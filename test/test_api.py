@@ -137,6 +137,22 @@ async def test_receive_ph_notification_with_matching_address_as_recipient(httpse
     assert conversations[0].nb_recv_messages == 2
 
 
+@pytest.mark.asyncio
+async def test_send_message(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    api = await create_api(httpserver)
+    await api.send_query(b'initial query')
+
+    await api.send_message(1, b'hello bob')
+
+    httpserver.check()
+    conversations = await api.repository.get_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].nb_sent_messages == 2
+    assert conversations[0].nb_recv_messages == 0
+
+
 async def create_api(httpserver, index = None):
     my_keys = gen_key_pair()
     other = gen_key_pair()

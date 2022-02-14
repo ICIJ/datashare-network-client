@@ -44,10 +44,17 @@ class DsnetApi:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
 
-    async def send_response(self, public_key: bytes, response_data: bytes):
+    async def send_response(self, public_key: bytes, response_data: bytes) -> None:
         conv = Conversation.create_from_recipient(private_key=self.private_key, other_public_key=public_key)
-        response = conv.create_response(response_data)
-        await self.repository.save_conversation(conv)
+        await self._send_message(conv, response_data)
+
+    async def send_message(self, conversation_id: int, message: bytes) -> None:
+        conv = await self.repository.get_conversation(conversation_id)
+        await self._send_message(conv, message)
+
+    async def _send_message(self, conversation: Conversation, message: bytes) -> None:
+        response = conversation.create_response(message)
+        await self.repository.save_conversation(conversation)
 
         async with ClientSession() as session:
             async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.to_bytes()) as http_response:

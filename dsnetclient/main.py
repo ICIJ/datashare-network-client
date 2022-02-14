@@ -56,7 +56,8 @@ class Demo(AsyncCmd):
         conversations = await self.api.repository.get_conversations()
         for conversation in conversations:
             query = conversation.query.decode() if conversation.query else ""
-            print(f"{conversation.id}: {query} for {conversation.other_public_key.hex()}")
+            print(f"{conversation.id}: {query} for {conversation.other_public_key.hex()} "
+                  f"(sent: {conversation.nb_sent_messages}/recv: {conversation.nb_recv_messages})")
         return False
 
     async def do_phs(self, _line: str) -> Optional[bool]:
@@ -89,6 +90,16 @@ class Demo(AsyncCmd):
                 print(f"{address} ({msg.timestamp}): {msg.payload} from {msg.from_key.hex()}")
         else:
             print('no such conversation id')
+        return False
+
+    async def do_message(self, line: str) -> Optional[bool]:
+        """
+        send a message to a conversation identified with its id
+        :param conversation_id
+        """
+        print(line)
+        conv_id, message = line.split(maxsplit=1)
+        await self.api.send_message(int(conv_id), message.encode())
         return False
 
     async def do_pk(self, _) -> Optional[bool]:
