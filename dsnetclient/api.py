@@ -60,11 +60,13 @@ class DsnetApi:
     async def start_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                               decoder: Callable[[bytes], Message] = MessageType.loads):
         callback = self.websocket_callback if notification_cb is None else notification_cb
+        url_ws = self.base_url.join(URL('/notifications'))
         while not self.stop:
             self.ws = None
             try:
                 async with ClientSession() as session:
-                    async with session.ws_connect(self.base_url.join(URL('/notifications'))) as self.ws:
+                    async with session.ws_connect(url_ws) as self.ws:
+                        logger.info(f"connected to websocket {url_ws}")
                         async for msg in self.ws:
                             if msg.type == WSMsgType.BINARY:
                                 await callback(decoder(msg.data))
@@ -74,7 +76,7 @@ class DsnetApi:
                                 logger.warning(f"received unhandled type {msg.type}")
             except ClientConnectorError:
                 logger.warning(f"ws connection lost waiting {self.reconnect_delay_seconds}s "
-                               f"before reconnect to {self.base_url.join(URL('/notifications'))}")
+                               f"before reconnect to {url_ws}")
                 await asyncio.sleep(self.reconnect_delay_seconds)
             except Exception as e:
                 logger.error(e)
