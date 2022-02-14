@@ -33,16 +33,26 @@ class Demo(AsyncCmd):
                 asyncio.get_event_loop().run_until_complete(self.repository.save_peer(Peer(key)))
 
     async def do_version(self, _line) -> Optional[bool]:
+        """
+        display client/server version of datashare network
+        """
         server_version = await self.api.get_server_version()
         print(f"client {__version__} with {server_version['message']}")
         return False
 
     async def do_query(self, line: str) -> Optional[bool]:
+        """
+        send a query to datashare network
+        :param query: query to broadcast
+        """
         print(f"send query: {line}")
         await self.api.send_query(line.encode())
         return False
 
     async def do_queries(self, _line: str) -> Optional[bool]:
+        """
+        list the queries sent or received (i.e. conversations)
+        """
         conversations = await self.api.repository.get_conversations()
         for conversation in conversations:
             query = conversation.query.decode() if conversation.query else ""
@@ -50,18 +60,28 @@ class Demo(AsyncCmd):
         return False
 
     async def do_phs(self, _line: str) -> Optional[bool]:
+        """
+        list the waiting pigeon holes
+        """
         phs = await self.api.repository.get_pigeonholes()
         for ph in phs:
             print(f"{ph.address.hex() if ph.address else ''}: peer {ph.peer_key.hex() if ph.peer_key else '?'} nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
         return False
 
     async def do_peers(self, _line: str) -> Optional[bool]:
+        """
+        list the peers keys
+        """
         peers = await self.api.repository.peers()
         for peer in peers:
-            print(f"{peer.id}: {peer.public_key.hex()}")
+            print(f"{peer.id}: {peer.public_key.hex()} {'(me)' if self.public_key == peer.public_key else ''}")
         return False
 
     async def do_messages(self, line: str) -> Optional[bool]:
+        """
+        list the messages related to a conversation
+        :param id: conversation id
+        """
         conv = await self.api.repository.get_conversation(int(line))
         if conv is not None:
             for msg in conv._messages:
@@ -72,10 +92,16 @@ class Demo(AsyncCmd):
         return False
 
     async def do_pk(self, _) -> Optional[bool]:
+        """
+        displays the user public key
+        """
         print(self.public_key.hex())
         return False
 
     async def do_EOF(self, line):
+        """
+        type CTRL+D or CTRL+C to exit
+        """
         return await self._exit(line)
 
     async def _exit(self, line: str) -> Optional[bool]:
