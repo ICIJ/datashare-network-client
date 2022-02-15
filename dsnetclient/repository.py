@@ -1,6 +1,7 @@
 import abc
 import sqlite3
 from collections import defaultdict
+from operator import attrgetter
 from typing import List, Mapping, Optional
 
 from databases import Database
@@ -289,7 +290,7 @@ class SqlalchemyRepository(Repository):
                 c.created_at,
                 c.query,
                 pigeonholes=list(ph_dict[id].values()),
-                messages=list(messages_dict[id].values()),
+                messages=list(sorted(messages_dict[id].values(), key=attrgetter('timestamp'))),
                 id=c.id
             )
             for id, c in conversations.items()

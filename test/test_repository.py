@@ -113,16 +113,19 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
     conversation = Conversation.create_from_querier(query_keys.secret, alicia_keys.public, query=b'Pop')
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message1 = ph.encrypt(b'alicia response1')
-    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message1, alicia_keys.public))
+    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message1, alicia_keys.public, timestamp=datetime(2022, 2, 15, 14, 13, 12)))
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message2 = ph.encrypt(b'alicia response2')
-    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message2, alicia_keys.public))
+    conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message2, alicia_keys.public, timestamp=datetime(2022, 2, 15, 14, 13, 14)))
 
     await repository.save_conversation(conversation)
 
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
     assert actual_conversation.nb_recv_messages == 2
     assert actual_conversation.nb_sent_messages == 1
+    assert actual_conversation._messages[0].payload == b'alicia response1'
+    assert actual_conversation._messages[1].payload == b'alicia response2'
+    assert actual_conversation._messages[2].payload == b'Pop'
 
 
 @pytest.mark.asyncio
