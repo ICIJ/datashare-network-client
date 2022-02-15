@@ -1,5 +1,5 @@
 import sys
-from dsnet import __version__
+from dsnetclient import __version__
 
 from setuptools import setup, find_packages
 
