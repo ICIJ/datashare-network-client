@@ -16,7 +16,7 @@ conversation_table = Table(
     "conversation",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("private_key", LargeBinary, nullable=False),
+    Column("secret_key", LargeBinary, nullable=False),
     Column("public_key", LargeBinary, index=True, nullable=False),
     Column("other_public_key", LargeBinary, index=True, nullable=False),
     Column('querier', Boolean, nullable=False, default=False),
@@ -41,9 +41,8 @@ pigeonhole_table = Table(
     Column("address", LargeBinary, primary_key=True),
     Column("adr_hex", String(8), nullable=False, index=True),
     Column("dh_key", LargeBinary, nullable=False),
-    Column("public_key", LargeBinary, nullable=False),
+    Column("key_for_hash", LargeBinary, nullable=False),
     Column("message_number", Integer, nullable=False),
-    Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False),
-    Column("peer_key", LargeBinary),
+    Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False)
 )
 

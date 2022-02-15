@@ -158,5 +158,5 @@ async def create_api(httpserver, index = None):
     other = gen_key_pair()
     repository = SqlalchemyRepository(database)
     await repository.save_peer(Peer(other.public))
-    api = DsnetApi(URL(httpserver.url_for('/')), repository, private_key=my_keys.private, index=index)
+    api = DsnetApi(URL(httpserver.url_for('/')), repository, secret_key=my_keys.secret, index=index)
     return api

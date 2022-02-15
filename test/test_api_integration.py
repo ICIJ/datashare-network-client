@@ -5,7 +5,7 @@ import databases
 import dsnetserver
 import pytest
 import pytest_asyncio
-from dsnet.message import Query, MessageType, Message
+from dsnet.message import MessageType, Message
 from dsnet.crypto import gen_key_pair
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
@@ -43,7 +43,7 @@ async def startup_and_shutdown_server():
 
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
-    assert await DsnetApi(URL('http://localhost:12345'), None, private_key=b"dummy").get_server_version() == {
+    assert await DsnetApi(URL('http://localhost:12345'), None, secret_key=b"dummy").get_server_version() == {
         'message': f'Datashare Network Server version {dsnetserver.__version__}'}
 
 
@@ -62,7 +62,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
         assert message.payload == b'payload_value'
         cb_called.set()
 
-    api = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys.private)
+    api = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys.secret)
     api.background_listening(cb)
     await api.send_query(b'payload_value')
 
@@ -76,7 +76,7 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
-    api = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys.private)
+    api = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys.secret)
     task = api.background_listening(dummy_cb)
     await api.close()
     await task
@@ -99,7 +99,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
         assert payload is not None
         cb_called.set()
 
-    api = DsnetApi(URL('http://localhost:23456'), repository, private_key=keys.private, reconnect_delay_seconds=0.1)
+    api = DsnetApi(URL('http://localhost:23456'), repository, secret_key=keys.secret, reconnect_delay_seconds=0.1)
     api.background_listening(cb)
 
     await local_server.down()
@@ -121,8 +121,8 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     await repository.save_peer(Peer(keys_alice.public))
     await repository.save_peer(Peer(keys_bob.public))
 
-    api_alice = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys_alice.private)
-    api_bob = DsnetApi(URL('http://localhost:12345'), repository, private_key=keys_bob.private)
+    api_alice = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys_alice.secret)
+    api_bob = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys_bob.secret)
 
     async def cb_alice(message: Message):
         if message.type() == MessageType.NOTIFICATION:

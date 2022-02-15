@@ -138,15 +138,18 @@ class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
 
+    @staticmethod
+    def _pigeonhole_from_row(row) -> PigeonHole:
+        return PigeonHole(
+            dh_key=row['dh_key'],
+            message_number=row['message_number'],
+            key_for_hash=row['key_for_hash'],
+            conversation_id=row['conversation_id'],
+        )
+
     async def get_pigeonholes(self) -> List[PigeonHole]:
-        return [
-            PigeonHole(
-                public_key_for_dh=row['public_key'],
-                message_number=row['message_number'],
-                dh_key=row['dh_key'],
-                conversation_id=row['conversation_id'],
-                peer_key=row['peer_key'],
-            ) for row in await self.database.fetch_all(pigeonhole_table.select())]
+        return [SqlalchemyRepository._pigeonhole_from_row(row)
+             for row in await self.database.fetch_all(pigeonhole_table.select())]
 
     async def get_conversation(self, id: int) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(conversation_table.c.id == id)
@@ -156,26 +159,14 @@ class SqlalchemyRepository(Repository):
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.adr_hex == adr_hex)
         rows = await self.database.fetch_all(stmt)
         return [
-            PigeonHole(
-                public_key_for_dh=row['public_key'],
-                message_number=row['message_number'],
-                dh_key=row['dh_key'],
-                conversation_id=row['conversation_id'],
-                peer_key=row['peer_key'],
-            )
+            SqlalchemyRepository._pigeonhole_from_row(row)
             for row in rows
         ]
 
     async def get_pigeonhole(self, address: bytes) -> Optional[PigeonHole]:
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.address == address)
         row = await self.database.fetch_one(stmt)
-        return PigeonHole(
-            public_key_for_dh=row['public_key'],
-            message_number=row['message_number'],
-            dh_key=row['dh_key'],
-            conversation_id=row['conversation_id'],
-            peer_key=row['peer_key'],
-        ) if row is not None else None
+        return SqlalchemyRepository._pigeonhole_from_row(row) if row is not None else None
 
     async def save_pigeonhole(self, pigeonhole: PigeonHole, conversation_id: int) -> None:
         try:
@@ -183,9 +174,8 @@ class SqlalchemyRepository(Repository):
                 address=pigeonhole.address,
                 adr_hex=PigeonHoleNotification.from_address(pigeonhole.address).adr_hex,
                 dh_key=pigeonhole.dh_key,
-                public_key=pigeonhole.public_key,
+                key_for_hash=pigeonhole.key_for_hash,
                 message_number=pigeonhole.message_number,
-                peer_key=pigeonhole.peer_key,
                 conversation_id=conversation_id
                 )
             )
@@ -200,7 +190,7 @@ class SqlalchemyRepository(Repository):
             if conversation.id is None:
                 conversation_id = await self.database.execute(
                     insert(conversation_table).values(
-                        private_key=conversation.private_key,
+                        secret_key=conversation.secret_key,
                         public_key=conversation.public_key,
                         other_public_key=conversation.other_public_key,
                         querier=conversation.querier,
@@ -270,7 +260,7 @@ class SqlalchemyRepository(Repository):
         conversations = dict()
         for row in conversation_maps:
             conversations[row['id']] = Conversation(
-                row['private_key'],
+                row['secret_key'],
                 row['other_public_key'],
                 row['querier'],
                 row['created_at'],
@@ -279,11 +269,10 @@ class SqlalchemyRepository(Repository):
             )
             if row['dh_key']:
                 ph_dict[row['id']][row['address']] = PigeonHole(
-                    public_key_for_dh=row['public_key_1'],
                     message_number=row['message_number'],
                     dh_key=row['dh_key'],
+                    key_for_hash=row['key_for_hash'],
                     conversation_id=row['id'],
-                    peer_key=row['peer_key']
                 )
             messages_dict[row['id']][row['address_1']] = PigeonHoleMessage(
                 address=row['address_1'],
@@ -294,7 +283,7 @@ class SqlalchemyRepository(Repository):
             )
         return [
             Conversation(
-                c.private_key,
+                c.secret_key,
                 c.other_public_key,
                 c.querier,
                 c.created_at,

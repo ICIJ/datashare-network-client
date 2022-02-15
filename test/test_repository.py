@@ -29,7 +29,7 @@ async def connect_disconnect_db():
 async def test_save_pigeonhole(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
-    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    ph = PigeonHole(alice_keys.public, bob_keys.secret, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
     await repository.save_pigeonhole(ph, 123)
@@ -37,7 +37,8 @@ async def test_save_pigeonhole(connect_disconnect_db):
 
     assert actual_ph is not None
     assert actual_ph.address == ph.address
-    assert actual_ph.public_key == ph.public_key
+    assert actual_ph.dh_key == ph.dh_key
+    assert actual_ph.key_for_hash == ph.key_for_hash
     assert actual_ph.message_number == ph.message_number
     assert actual_ph.sym_key == ph.sym_key
 
@@ -46,11 +47,11 @@ async def test_save_pigeonhole(connect_disconnect_db):
 async def test_get_pigeonhole_by_adr(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
-    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    ph = PigeonHole(alice_keys.public, bob_keys.secret, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
     await repository.save_pigeonhole(ph, 123)
-    await repository.save_pigeonhole(PigeonHole(gen_key_pair().public, bob_keys.private, bob_keys.public), 123)
+    await repository.save_pigeonhole(PigeonHole(gen_key_pair().public, bob_keys.secret, bob_keys.public), 123)
     phs = await repository.get_pigeonholes_by_adr(PigeonHoleNotification.from_address(ph.address).adr_hex)
 
     assert len(phs) == 1
@@ -61,7 +62,7 @@ async def test_get_pigeonhole_by_adr(connect_disconnect_db):
 async def test_save_pigeonhole_idempotency(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
-    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    ph = PigeonHole(alice_keys.public, bob_keys.secret, bob_keys.public)
     repository = SqlalchemyRepository(database)
 
     await repository.save_pigeonhole(ph, 123)
@@ -73,7 +74,7 @@ async def test_save_pigeonhole_idempotency(connect_disconnect_db):
 async def test_delete_pigeonhole(connect_disconnect_db):
     bob_keys = gen_key_pair()
     alice_keys = gen_key_pair()
-    ph = PigeonHole(alice_keys.public, bob_keys.private, bob_keys.public)
+    ph = PigeonHole(alice_keys.public, bob_keys.secret, bob_keys.public)
     repository = SqlalchemyRepository(database)
     await repository.save_pigeonhole(ph, 123)
 
@@ -85,7 +86,7 @@ async def test_delete_pigeonhole(connect_disconnect_db):
 async def test_save_conversation(connect_disconnect_db):
     query_keys = gen_key_pair()
     bob_keys = gen_key_pair()
-    conversation = Conversation.create_from_querier(query_keys.private, bob_keys.public, query=b'France')
+    conversation = Conversation.create_from_querier(query_keys.secret, bob_keys.public, query=b'France')
     conversation.created_at = datetime(2022, 1, 2, 3, 4, 5)
 
     repository = SqlalchemyRepository(database)
@@ -93,7 +94,7 @@ async def test_save_conversation(connect_disconnect_db):
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
 
     assert actual_conversation is not None
-    assert actual_conversation.private_key == conversation.private_key
+    assert actual_conversation.secret_key == conversation.secret_key
     assert actual_conversation.public_key == conversation.public_key
     assert actual_conversation.other_public_key == conversation.other_public_key
     assert actual_conversation.querier == conversation.querier
@@ -109,7 +110,7 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
 
     query_keys = gen_key_pair()
     alicia_keys = gen_key_pair()
-    conversation = Conversation.create_from_querier(query_keys.private, alicia_keys.public, query=b'Pop')
+    conversation = Conversation.create_from_querier(query_keys.secret, alicia_keys.public, query=b'Pop')
     ph = conversation.pigeonhole_for_address(conversation.last_address)
     encrypted_message1 = ph.encrypt(b'alicia response1')
     conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message1, alicia_keys.public))
@@ -139,7 +140,7 @@ async def test_get_conversation_by_address(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'France')
+    conversation = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'France')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -152,7 +153,7 @@ async def test_get_conversations(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    conversation = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -166,7 +167,7 @@ async def test_get_conversation_buy_id(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
-    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    conversation = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
     await repository.save_conversation(conversation)
 
     assert await repository.get_conversation(1) is not None
@@ -177,7 +178,7 @@ async def test_get_conversations_filter_by_properties(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
 
-    conversation = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    conversation = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
 
     repository = SqlalchemyRepository(database)
     await repository.save_conversation(conversation)
@@ -189,8 +190,8 @@ async def test_get_conversations_filter_by_properties(connect_disconnect_db):
 async def test_get_conversations_with_messages(connect_disconnect_db):
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
-    carol_side = Conversation.create_from_recipient(carol_keys.private, query_keys.public)
-    querier_side = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    carol_side = Conversation.create_from_recipient(carol_keys.secret, query_keys.public)
+    querier_side = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
     querier_side.add_message(carol_side.create_response(b"Hi"))
 
     repository = SqlalchemyRepository(database)
@@ -209,8 +210,8 @@ async def test_save_conversation_deletes_old_pigeonholes(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     query_keys = gen_key_pair()
     carol_keys = gen_key_pair()
-    carol_side = Conversation.create_from_recipient(carol_keys.private, query_keys.public)
-    querier_side = Conversation.create_from_querier(query_keys.private, carol_keys.public, query=b'Hello')
+    carol_side = Conversation.create_from_recipient(carol_keys.secret, query_keys.public)
+    querier_side = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
     await repository.save_conversation(querier_side)
     querier_side = (await repository.get_conversations())[0]
     querier_side.add_message(carol_side.create_response(b"Hi"))

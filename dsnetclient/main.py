@@ -23,7 +23,7 @@ class Demo(AsyncCmd):
         self.private_key = bytes.fromhex(private_key)
         self.public_key = get_public_key(self.private_key)
         self.repository = SqlalchemyRepository(self.database)
-        self.api = DsnetApi(server_url, self.repository, private_key=self.private_key, index=MemoryIndex(my_entities))
+        self.api = DsnetApi(server_url, self.repository, secret_key=self.private_key, index=MemoryIndex(my_entities))
         self._listener = self.api.background_listening()
         add_stdout_handler(level=logging.DEBUG)
         self.prompt = f'ds@{self.public_key[0:4].hex()}> '

@@ -17,11 +17,11 @@ from dsnetclient.repository import Repository, SqlalchemyRepository
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, private_key: bytes, reconnect_delay_seconds=2, index: Index = None) -> None:
+    def __init__(self, url: URL, repository: Repository, secret_key: bytes, reconnect_delay_seconds=2, index: Index = None) -> None:
         self.repository = repository
         self.base_url = url
         self.index = index
-        self.private_key = private_key
+        self.secret_key = secret_key
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
@@ -33,10 +33,10 @@ class DsnetApi:
 
     async def send_query(self, query: bytes) -> None:
         query_keys = gen_key_pair()
-        public_key = get_public_key(self.private_key)
+        public_key = get_public_key(self.secret_key)
         for peer in await self.repository.peers():
             if peer.public_key != public_key:
-                conv = Conversation.create_from_querier(query_keys.private, peer.public_key, query)
+                conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query)
                 await self.repository.save_conversation(conv)
 
         payload = Query(query_keys.public, query).to_bytes()
@@ -45,7 +45,7 @@ class DsnetApi:
                 response.raise_for_status()
 
     async def send_response(self, public_key: bytes, response_data: bytes) -> None:
-        conv = Conversation.create_from_recipient(private_key=self.private_key, other_public_key=public_key)
+        conv = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key)
         await self._send_message(conv, response_data)
 
     async def send_message(self, conversation_id: int, message: bytes) -> None:
@@ -108,7 +108,7 @@ class DsnetApi:
                 async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
                     http_response.raise_for_status()
                     message = PigeonHoleMessage.from_bytes(await http_response.read())
-                    message.from_key = ph.peer_key if ph.peer_key is not None else ph.public_key
+                    message.from_key = ph.key_for_hash
                     conversation = await self.repository.get_conversation_by_address(ph.address)
                     logger.debug(f"adding message {message.address.hex()} to conversation {conversation.id}")
                     conversation.add_message(message)
@@ -130,7 +130,7 @@ def main():
     engine = create_engine(url)
     metadata.create_all(engine)
     repository = SqlalchemyRepository(databases.Database(url))
-    api = DsnetApi(URL('http://localhost:8000'), repository, keys.private, index=MemoryIndex({"foo", "bar"}))
+    api = DsnetApi(URL('http://localhost:8000'), repository, keys.secret, index=MemoryIndex({"foo", "bar"}))
 
     asyncio.get_event_loop().run_until_complete(api.start_listening())
 
