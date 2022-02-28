@@ -7,23 +7,25 @@ import click
 import databases
 from dsnet.crypto import get_public_key, gen_key_pair
 from dsnet.logger import add_stdout_handler
+from elasticsearch import AsyncElasticsearch
 from yarl import URL
 
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi
 from dsnetclient.async_cmd import AsyncCmd
-from dsnetclient.index import MemoryIndex
+from dsnetclient.index import MemoryIndex, Index, ElasticsearchIndex
+from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
 
 class Demo(AsyncCmd):
-    def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], my_entities: Set[str]):
+    def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index):
         super().__init__()
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
         self.public_key = get_public_key(self.private_key)
         self.repository = SqlalchemyRepository(self.database)
-        self.api = DsnetApi(server_url, self.repository, secret_key=self.private_key, index=MemoryIndex(my_entities))
+        self.api = DsnetApi(server_url, self.repository, secret_key=self.private_key, index=index)
         self._listener = self.api.background_listening()
         add_stdout_handler(level=logging.DEBUG)
         self.prompt = f'ds@{self.public_key[0:4].hex()}> '
@@ -154,18 +156,24 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--private-key', prompt='User private key', help='Private key file (prefix with @)')
 @click.option('--database-url', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
 @click.option('--keys', prompt='Others\' key', help='Path to file containing keys (one key per line)')
-@click.option('--entities-file', prompt='Entities file', help='Entities files (one per line)')
-def shell(server_url, private_key, database_url, keys, entities_file):
+@click.option('--elasticsearch-url', cls=MutuallyExclusiveOption, help='Elasticsearch url ex: http://elasticsearch:9200',  mutually_exclusive=["entities_file"])
+@click.option('--entities-file', cls=MutuallyExclusiveOption, help='Entities files (one per line)',  mutually_exclusive=["elasticsearch_url"])
+def shell(server_url, private_key, database_url, elasticsearch_url, keys, entities_file):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
     with open(keys, "r") as f:
         keys_list = f.readlines()
 
-    with open(entities_file, "r") as f:
-        my_entities = f.readlines()
-    my_entities = [e.strip('\n') for e in my_entities]
-    asyncio.get_event_loop().run_until_complete(Demo(URL(server_url), private_key_content, database_url, keys_list, set(my_entities)).async_cmdloop())
+    if elasticsearch_url is not None:
+        index = ElasticsearchIndex(AsyncElasticsearch(elasticsearch_url))
+    else:
+        with open(entities_file, "r") as f:
+            my_entities = f.readlines()
+        my_entities = [e.strip('\n') for e in my_entities]
+        index = MemoryIndex(set(my_entities))
+
+    asyncio.get_event_loop().run_until_complete(Demo(URL(server_url), private_key_content, database_url, keys_list, index).async_cmdloop())
 
 
 if __name__ == '__main__':

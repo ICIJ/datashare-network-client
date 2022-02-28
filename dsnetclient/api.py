@@ -68,6 +68,8 @@ class DsnetApi:
                               decoder: Callable[[bytes], Message] = MessageType.loads):
         callback = self.websocket_callback if notification_cb is None else notification_cb
         url_ws = self.base_url.join(URL('/notifications'))
+        nb_errors = 0
+        nb_max_errors = 5
         while not self.stop:
             self.ws = None
             try:
@@ -86,7 +88,10 @@ class DsnetApi:
                                f"before reconnect to {url_ws}")
                 await asyncio.sleep(self.reconnect_delay_seconds)
             except Exception as e:
+                nb_errors += 1
                 logger.error(e)
+                if nb_errors >= nb_max_errors:
+                    raise e
 
     def background_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                              decoder: Callable[[bytes], Message] = MessageType.loads) -> Task:
