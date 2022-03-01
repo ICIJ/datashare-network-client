@@ -1,5 +1,6 @@
 import asyncio
 from asyncio import Task
+from json import loads
 from typing import Awaitable, Callable
 
 import databases
@@ -124,8 +125,7 @@ class DsnetApi:
         local_query = await self.repository.get_conversation_by_key(msg.public_key)
         if local_query is None:
             results = await self.index.search(msg.payload)
-            if results:
-                await self.send_response(msg.public_key, b'\\'.join(results))
+            await self.send_response(msg.public_key, results)
 
 
 def main():

@@ -13,7 +13,7 @@ from yarl import URL
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi
 from dsnetclient.async_cmd import AsyncCmd
-from dsnetclient.index import MemoryIndex, Index, ElasticsearchIndex
+from dsnetclient.index import MemoryIndex, Index, LuceneIndex
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
@@ -166,7 +166,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, keys, entiti
         keys_list = f.readlines()
 
     if elasticsearch_url is not None:
-        index = ElasticsearchIndex(AsyncElasticsearch(elasticsearch_url))
+        index = LuceneIndex(AsyncElasticsearch(elasticsearch_url))
     else:
         with open(entities_file, "r") as f:
             my_entities = f.readlines()

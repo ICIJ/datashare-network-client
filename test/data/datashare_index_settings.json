@@ -1,0 +1,22 @@
+{
+  "index.mapping.total_fields.limit": 100000,
+  "index.number_of_shards" : 1,
+  "analysis": {
+    "analyzer": {
+      "path_analyzer": {
+        "tokenizer": "path_tokenizer"
+      }
+    },
+    "tokenizer": {
+      "path_tokenizer": {
+        "type": "path_hierarchy"
+      }
+    },
+    "normalizer": {
+      "keyword_lowercase": {
+        "type": "custom",
+        "filter": ["lowercase"]
+      }
+    }
+  }
+}

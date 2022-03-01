@@ -72,12 +72,14 @@ async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_
 
 @pytest.mark.asyncio
 async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disconnect_db):
+    httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver, MemoryIndex(set()))
 
     await api.handle_query(Query(gen_key_pair().public, b'foo'))
 
     httpserver.check()
-    assert await api.repository.get_conversations() == []
+    conv = (await api.repository.get_conversations())[0]
+    assert conv.last_message.payload == b"[]"
 
 
 @pytest.mark.asyncio
