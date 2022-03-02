@@ -3,6 +3,16 @@ jobs:
   build:
     docker:
       - image: circleci/python:3.6
+      - image: docker.elastic.co/elasticsearch/elasticsearch:7.9.1
+        environment:
+          - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+          - "discovery.type=single-node"
+          - "cluster.name=datashare"
+          # CORS
+          - "http.cors.enabled=true"
+          - "http.cors.allow-origin=*"
+          - "http.cors.allow-methods=OPTIONS, HEAD, GET, POST, PUT, DELETE"
+        name: elasticsearch
 
     steps:
       - checkout
