@@ -9,6 +9,8 @@ aiohttp = '*'
 click = '*'
 aioconsole = '*'
 elasticsearch = '==7.9.1'
+Authlib = '*'
+httpx = '*'
 
 [dev-packages]
 pytest-httpserver = "*"
@@ -21,6 +23,7 @@ pytest-timeout = '*'
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
 twine = "==3.2.0"
+fastapi = {extras = ["all"], version = "*"}
 
 [requires]
 python_version = "3"
