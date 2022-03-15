@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 import databases
@@ -7,6 +8,7 @@ from dsnet.core import PigeonHole, Conversation
 from dsnet.crypto import gen_key_pair
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from sqlalchemy import create_engine
+from sscred import AbeParam
 
 from dsnetclient.models import metadata
 from dsnetclient.repository import SqlalchemyRepository, Peer
@@ -245,3 +247,23 @@ async def test_save_peers_twice(connect_disconnect_db):
     await repository.save_peer(Peer(peer_keys.public))
     assert len(await repository.peers()) == 1
 
+
+@pytest.mark.asyncio
+async def test_save_token_server_key(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    assert await repository.save_token_server_key(b'pkey2')
+    assert await repository.save_token_server_key(b'pkey1')
+
+    server_key = await repository.get_token_server_key()
+    assert server_key == b'pkey1'
+
+
+@pytest.mark.asyncio
+async def test_save_tokens(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    tokens = [b"riri", b"fifi", b"loulou"]
+    assert await repository.save_tokens(tokens) == 3
+    assert await repository.pop_token() in tokens
+    assert await repository.pop_token() in tokens
+    assert await repository.pop_token() in tokens
+    assert await repository.pop_token() is None

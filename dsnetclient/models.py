@@ -46,3 +46,16 @@ pigeonhole_table = Table(
     Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False)
 )
 
+serverkey_table = Table(
+    "server_key",
+    metadata,
+    Column("master_key", LargeBinary, primary_key=True),
+    Column('timestamp', DateTime, nullable=False)
+)
+
+token_table = Table(
+    "token",
+    metadata,
+    Column("token", LargeBinary, primary_key=True),
+    Column('timestamp', DateTime, nullable=False)
+)

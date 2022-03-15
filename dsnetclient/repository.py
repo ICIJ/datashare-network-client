@@ -1,4 +1,5 @@
 import abc
+import datetime
 import sqlite3
 from collections import defaultdict
 from operator import attrgetter
@@ -8,10 +9,10 @@ from databases import Database
 from dsnet.core import Conversation, PigeonHole
 from dsnet.logger import logger
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
-from sqlalchemy import insert, select, column, delete
+from sqlalchemy import insert, select, column, delete, desc
 from sqlalchemy.sql import Select
 
-from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table
+from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, token_table
 
 
 class Peer:
@@ -132,6 +133,35 @@ class Repository(metaclass=abc.ABCMeta):
 
         :param adr: short pigeon hole address
         :return: list of matching pigeonholes
+        """
+
+    @abc.abstractmethod
+    async def save_token_server_key(self, master_public_key: bytes) -> bool:
+        """
+        Save master public key into the repository
+        :param master_public_key: token server master public key
+        :return: True if saved else False
+        """
+
+    @abc.abstractmethod
+    async def get_token_server_key(self) -> bytes:
+        """
+        Get the master public key from the repository
+        :return: Public key bytes
+        """
+
+    @abc.abstractmethod
+    async def save_tokens(self, tokens: List[bytes]) -> int:
+        """
+        Save query tokens
+        :return: True if saved else False
+        """
+
+    @abc.abstractmethod
+    async def pop_token(self) -> bytes:
+        """
+        pop a query token from the database
+        :return: token binary
         """
 
 
@@ -305,3 +335,32 @@ class SqlalchemyRepository(Repository):
             await self.database.execute(insert(peer_table).values(public_key=peer.public_key))
         except sqlite3.IntegrityError:
             logger.debug("Attempted to save an existing peer")
+
+    async def save_token_server_key(self, public_key: bytes) -> bool:
+        stmt = insert(serverkey_table).values(
+            master_key=public_key,
+            timestamp=datetime.datetime.utcnow(),
+        )
+        ret = await self.database.execute(stmt)
+        return ret > 0
+
+    async def get_token_server_key(self) -> bytes:
+        stmt = serverkey_table.select().order_by(desc(serverkey_table.c.timestamp)).limit(1)
+        row = await self.database.fetch_one(stmt)
+        return row['master_key'] if row else None
+
+    async def save_tokens(self, tokens: List[bytes]) -> int:
+        data = [{"token": token, "timestamp": datetime.datetime.utcnow()} for token in tokens]
+        stmt = insert(token_table).values(data)
+        return await self.database.execute(stmt)
+
+    async def pop_token(self) -> Optional[bytes]:
+        async with self.database.transaction():
+            first = token_table.select().order_by(desc(token_table.c.timestamp)).limit(1)
+            row = await self.database.fetch_one(first)
+            if not row:
+                return None
+            stmt = token_table.delete().where(token_table.c.token == row["token"])
+            await self.database.execute(stmt)
+            return row['token']
+

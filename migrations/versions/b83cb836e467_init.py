@@ -1,8 +1,8 @@
 """init
 
-Revision ID: b932dcdce17e
+Revision ID: b83cb836e467
 Revises: 
-Create Date: 2022-02-15 13:25:16.515717
+Create Date: 2022-03-15 17:08:45.600312
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'b932dcdce17e'
+revision = 'b83cb836e467'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -36,6 +36,16 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_peer_public_key'), 'peer', ['public_key'], unique=True)
+    op.create_table('server_key',
+    sa.Column('master_key', sa.LargeBinary(), nullable=False),
+    sa.Column('timestamp', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('master_key')
+    )
+    op.create_table('token',
+    sa.Column('token', sa.LargeBinary(), nullable=False),
+    sa.Column('timestamp', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('token')
+    )
     op.create_table('message',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('address', sa.LargeBinary(), nullable=True),
@@ -67,6 +77,8 @@ def downgrade():
     op.drop_table('pigeonhole')
     op.drop_index(op.f('ix_message_from_key'), table_name='message')
     op.drop_table('message')
+    op.drop_table('token')
+    op.drop_table('server_key')
     op.drop_index(op.f('ix_peer_public_key'), table_name='peer')
     op.drop_table('peer')
     op.drop_index(op.f('ix_conversation_public_key'), table_name='conversation')

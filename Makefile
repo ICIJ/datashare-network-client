@@ -24,3 +24,9 @@ patch:
 distribute:
 		pipenv run python setup.py sdist bdist_wheel
 		pipenv run twine upload dist/*
+
+db_generate_migration:
+		alembic revision --autogenerate -m "init"
+
+db_make_migration:
+		alembic upgrade head
