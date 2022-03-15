@@ -11,6 +11,7 @@ aioconsole = '*'
 elasticsearch = '==7.9.1'
 Authlib = '*'
 httpx = '*'
+sscred = '0.2.0'
 
 [dev-packages]
 pytest-httpserver = "*"
@@ -25,6 +26,7 @@ setuptools-pipfile = "==0.4.1"
 twine = "==3.2.0"
 fastapi = {extras = ["all"], version = "*"}
 fastapi-sessions = "*"
+datashare-network-tokenserver= "0.1.0"
 
 [requires]
 python_version = "3"
