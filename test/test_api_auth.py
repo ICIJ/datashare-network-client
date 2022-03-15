@@ -38,11 +38,10 @@ async def test_auth(startup_and_shutdown_server):
                    oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback"))
     url, _ = api.start_auth('http://localhost:12345/authorize')
     assert url is not None    # will be displayed to user for use in browser
-    print(url)
     returned_url = await authenticate(url, 'johndoe', 'secret')  # will be pasted by the user in ds client CLI
     await api.end_auth("http://localhost:12345/token", returned_url)
 
-    assert 3 == await api.fetch_pre_tokens(nb_tokens=3)
+    assert 1 == await api.fetch_pre_tokens(nb_tokens=3)
 
 
 async def authenticate(authorize_url, username, password) -> str:
