@@ -2,6 +2,7 @@ import random
 import string
 from typing import Optional
 
+import httpx
 from authlib.oauth2.rfc6750 import BearerToken
 from fastapi import HTTPException, FastAPI, Response, Depends
 from fastapi import status, Form
@@ -50,6 +51,9 @@ class User(BaseModel):
 
 class UserInDB(User):
     hashed_password: str
+
+    def __hash__(self):
+        return hash(self.hashed_password)
 
 
 def get_user(db, username: str):
@@ -122,9 +126,26 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@app.post("/api/pre_tokens")
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    return JSONResponse([1, 2, 3])
+async def proxy_request(request: Request):
+    async with httpx.AsyncClient() as client:
+        body = await request.body()
+        response = await client.request(request.method, body=body, url=request.url)
+        return Response(content=response.content, media_type=response.headers['Content-Type'])
+
+
+@app.get("/api/v2/dstokens/publickey")
+async def dstokens_publickey(request: Request, current_user: User = Depends(get_current_user)):
+    return await proxy_request(request)
+
+
+@app.get("/api/v2/dstokens/commitments")
+async def dstokens_commitments(request: Request, current_user: User = Depends(get_current_user)):
+    return await proxy_request(request)
+
+
+@app.post("/api/v2/dstokens/pretokens")
+async def dstokens_pretokens(request: Request, current_user: User = Depends(get_current_user)):
+    return await proxy_request(request)
 
 
 if __name__ == '__main__':
