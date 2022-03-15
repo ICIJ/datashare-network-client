@@ -1,10 +1,22 @@
+import random
+import string
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, status, Response
+from authlib.oauth2.rfc6750 import BearerToken
+from fastapi import HTTPException, FastAPI, Response, Depends
+from fastapi import status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, JSONResponse
 
-fake_users_db = {
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="foo")
+
+TOKEN_MAP = dict()
+USER_MAP = dict()
+FAKE_USERS_DB = {
     "johndoe": {
         "username": "johndoe",
         "full_name": "John Doe",
@@ -20,8 +32,6 @@ fake_users_db = {
         "disabled": True,
     },
 }
-
-app = FastAPI()
 
 
 def fake_hash_password(password: str):
@@ -49,9 +59,7 @@ def get_user(db, username: str):
 
 
 def fake_decode_token(token):
-    # This doesn't provide any security at all
-    # Check the next version
-    user = get_user(fake_users_db, token)
+    user = USER_MAP.get(token)
     return user
 
 
@@ -66,36 +74,57 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-
 @app.get("/authorize")
-async def authorize():
+async def authorize(request: Request):
+    request.session['redirect_uri'] = request.query_params['redirect_uri']
+    request.session['client_id'] = request.query_params['client_id']
+    request.session['state'] = request.query_params['state']
     return Response(status_code=302, headers={"Location": "/signin"})
 
 
-@app.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    print(form_data.username)
-    print(form_data.password)
-    user_dict = fake_users_db.get(form_data.username)
+@app.get("/signin")
+async def get_form():
+    return HTMLResponse(content='<html><body><form method="post">'
+                            '<input type="text" name="username"/>'
+                            '<input type="password" name="password"/>'
+                            '<input type="submit" value="Submit"/>'
+                            '</form></body></html>')
+
+
+@app.post("/signin")
+async def signin(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    user_dict = FAKE_USERS_DB.get(form_data.username)
     if not user_dict:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     user = UserInDB(**user_dict)
     hashed_password = fake_hash_password(form_data.password)
-    print(user)
     if not hashed_password == user.hashed_password:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
+    response = Response(status_code=302)
+    token = BearerToken(token_generator)(user, 'authenticate')
+    TOKEN_MAP[token['access_token']] = token
+    USER_MAP[token['access_token']] = user_dict
+    response.headers['Location'] = f"http://127.0.0.1:12345/callback?code={token['access_token']}&state={request.session['state']}"
+    return response
 
-    return {"access_token": user.username, "token_type": "bearer"}
+
+def token_generator(client, grant_type, user, scope):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=42))
+
+
+@app.post("/token")
+async def token(code: str = Form(...)):
+    return TOKEN_MAP.pop(code)
 
 
 @app.get("/users/me")
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
+async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@app.post("/api/pre_tokens")
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return JSONResponse([1, 2, 3])
 
 
 if __name__ == '__main__':

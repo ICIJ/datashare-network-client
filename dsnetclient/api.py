@@ -1,10 +1,11 @@
 import asyncio
 from asyncio import Task
 from json import loads
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Tuple
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
+from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
@@ -18,10 +19,12 @@ from dsnetclient.repository import Repository, SqlalchemyRepository
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, secret_key: bytes, reconnect_delay_seconds=2, index: Index = None) -> None:
+    def __init__(self, url: URL, repository: Repository, secret_key: bytes, reconnect_delay_seconds=2,
+                 index: Index = None, oauth_client: AsyncOAuth2Client = None) -> None:
         self.repository = repository
         self.base_url = url
         self.index = index
+        self.oauth_client = oauth_client
         self.secret_key = secret_key
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
@@ -126,6 +129,20 @@ class DsnetApi:
         if local_query is None:
             results = await self.index.search(msg.payload)
             await self.send_response(msg.public_key, results)
+
+    def start_auth(self, authorize_url: str) -> Tuple[str, str]:
+        return self.oauth_client.create_authorization_url(authorize_url)
+
+    async def end_auth(self, token_endpoint: str, authorization_response: str):
+        await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
+
+    async def fetch_pre_tokens(self, nb_tokens=20) -> int:
+        # checks current master public key against cached master public key
+        # server sends commitments to client
+        # client ciphers
+        pre_tokens_resp = await self.oauth_client.post('http://localhost:12345/api/pre_tokens')
+        pre_tokens = pre_tokens_resp.json()
+        return len(pre_tokens)
 
 
 def main():
