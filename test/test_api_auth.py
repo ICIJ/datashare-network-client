@@ -6,8 +6,8 @@ import pytest
 import pytest_asyncio
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from sqlalchemy import create_engine
-from sscred.blind_signature import AbeParam
-from sscred.pack import packb
+from sscred.blind_signature import AbeParam, AbeSignature, AbePublicKey
+from sscred.pack import packb, unpackb
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
@@ -20,6 +20,7 @@ database = databases.Database(DATABASE_URL)
 pkey = None
 TOKEN_SERVER_PORT = 12346
 os.environ['TOKEN_SERVER_PORT'] = str(TOKEN_SERVER_PORT)
+os.environ['TOKEN_SERVER_NBTOKENS'] = str(3)
 
 
 @pytest.fixture
@@ -68,6 +69,34 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
     await api.end_auth("http://localhost:12345/token", returned_url)
 
     assert 0 == (await api.fetch_pre_tokens())
+
+
+@pytest.mark.asyncio
+async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    api = DsnetApi(
+        URL('http://notused'),
+        repository,
+        secret_key=b"dummy",
+        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
+    )
+    url, _ = api.start_auth('http://localhost:12345/authorize')
+    returned_url = await authenticate(url, 'johndoe', 'secret')  # will be pasted by the user in ds client CLI
+    await api.end_auth("http://localhost:12345/token", returned_url)
+
+    assert 3 == await api.fetch_pre_tokens()
+
+    server_key: AbePublicKey = unpackb(await repository.get_token_server_key())
+    assert server_key is not None
+    assert isinstance(server_key, AbePublicKey)
+
+    token: AbeSignature = unpackb(await repository.pop_token())
+    assert isinstance(token, AbeSignature)
+    assert server_key.verify_signature(token)
+
+    assert (await repository.pop_token()) is not None
+    assert (await repository.pop_token()) is not None
+    assert (await repository.pop_token()) is None
 
 
 async def authenticate(authorize_url, username, password) -> str:

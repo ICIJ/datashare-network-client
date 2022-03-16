@@ -18,6 +18,7 @@ app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="foo")
 
 TOKEN_SERVER_HOST = URL(f"http://localhost:{os.getenv('TOKEN_SERVER_PORT', 12346)}")
+TOKEN_SERVER_NBTOKENS = os.getenv('TOKEN_SERVER_NBTOKENS', 3)
 
 TOKEN_MAP = dict()
 USER_MAP = dict()
@@ -132,32 +133,32 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 URL_MAP = {
     "/api/v2/dstokens/publickey": URL("/publickey"),
     "/api/v2/dstokens/commitments": URL("/commitments"),
-    "/api/v2/dstokens/pretokens": URL("/tokens"),
+    "/api/v2/dstokens/pretokens": URL("/pretokens"),
 }
 
 
-async def proxy_request(request: Request):
+async def proxy_request(request: Request, user: User):
     async with httpx.AsyncClient() as client:
         body = await request.body()
         path = URL_MAP.get(request.url.path)
-        url_join = str(URL.join(TOKEN_SERVER_HOST, path))
+        url_join = str(URL(TOKEN_SERVER_HOST).join(path).join(URL(f"?uid={user['username']}&number={TOKEN_SERVER_NBTOKENS}")))
         response = await client.request(request.method, url_join, content=body)
         return Response(content=response.content, media_type=response.headers['Content-Type'])
 
 
 @app.get("/api/v2/dstokens/publickey")
 async def dstokens_publickey(request: Request, current_user: User = Depends(get_current_user)):
-    return await proxy_request(request)
+    return await proxy_request(request, current_user)
 
 
-@app.get("/api/v2/dstokens/commitments")
+@app.post("/api/v2/dstokens/commitments")
 async def dstokens_commitments(request: Request, current_user: User = Depends(get_current_user)):
-    return await proxy_request(request)
+    return await proxy_request(request, current_user)
 
 
 @app.post("/api/v2/dstokens/pretokens")
 async def dstokens_pretokens(request: Request, current_user: User = Depends(get_current_user)):
-    return await proxy_request(request)
+    return await proxy_request(request, current_user)
 
 
 if __name__ == '__main__':

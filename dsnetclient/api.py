@@ -159,7 +159,7 @@ class DsnetApi:
             server_public_key: AbePublicKey = unpackb(server_public_key_raw)
 
             # Retrieve commitments from server
-            commitments_resp = await self.oauth_client.get('/api/v2/dstokens/commitments')
+            commitments_resp = await self.oauth_client.post('/api/v2/dstokens/commitments')
             commitments: List[SignerCommitMessage] = unpackb(commitments_resp.content)
 
             abe_user = AbeUser(server_public_key)
@@ -179,7 +179,7 @@ class DsnetApi:
 
             # send challenges to server
             # retrieve pre-tokens from server
-            pretokens_resp = await self.oauth_client.post('/api/v2/dstokens/pretokens')
+            pretokens_resp = await self.oauth_client.post('/api/v2/dstokens/pretokens', content=packb(challenges))
             pretokens: List[SignerResponseMessage] = unpackb(pretokens_resp.content)
             for pretoken, internal in zip(pretokens, challenges_internal):
                 token = abe_user.compute_signature(pretoken, internal)
@@ -187,6 +187,7 @@ class DsnetApi:
                 tokens.append(packb(token))
 
             # bulk insert tokens in DB
+            await self.repository.save_token_server_key(server_public_key_raw)
             await self.repository.save_tokens(tokens)
 
         return len(tokens)
