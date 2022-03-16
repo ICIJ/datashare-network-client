@@ -148,7 +148,7 @@ class DsnetApi:
         return self.oauth_client.create_authorization_url(authorize_url)
 
     async def end_auth(self, token_endpoint: str, authorization_response: str):
-        await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
+        return await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
 
     async def fetch_pre_tokens(self) -> int:
         tokens: List[bytes] = []
