@@ -1,3 +1,4 @@
+import os
 import random
 import string
 from typing import Optional
@@ -10,10 +11,13 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse
+from yarl import URL
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="foo")
+
+TOKEN_SERVER_HOST = URL(f"http://localhost:{os.getenv('TOKEN_SERVER_PORT', 12346)}")
 
 TOKEN_MAP = dict()
 USER_MAP = dict()
@@ -125,11 +129,19 @@ async def token(code: str = Form(...)):
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+URL_MAP = {
+    "/api/v2/dstokens/publickey": URL("/publickey"),
+    "/api/v2/dstokens/commitments": URL("/commitments"),
+    "/api/v2/dstokens/pretokens": URL("/tokens"),
+}
+
 
 async def proxy_request(request: Request):
     async with httpx.AsyncClient() as client:
         body = await request.body()
-        response = await client.request(request.method, body=body, url=request.url)
+        path = URL_MAP.get(request.url.path)
+        url_join = str(URL.join(TOKEN_SERVER_HOST, path))
+        response = await client.request(request.method, url_join, content=body)
         return Response(content=response.content, media_type=response.headers['Content-Type'])
 
 

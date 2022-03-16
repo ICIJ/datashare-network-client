@@ -1,17 +1,34 @@
+import os
+
 import databases
 import httpx
 import pytest
 import pytest_asyncio
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from sqlalchemy import create_engine
+from sscred.blind_signature import AbeParam
+from sscred.pack import packb
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
 from dsnetclient.models import metadata as metadata_client
+from dsnetclient.repository import SqlalchemyRepository
 from test.server import UvicornTestServer
 
 DATABASE_URL = 'sqlite:///auth_test.db'
 database = databases.Database(DATABASE_URL)
+pkey = None
+TOKEN_SERVER_PORT = 12346
+os.environ['TOKEN_SERVER_PORT'] = str(TOKEN_SERVER_PORT)
+
+
+@pytest.fixture
+def pkey():
+    global pkey
+    params = AbeParam()
+    skey, pkey = params.generate_new_key_pair()
+    os.environ['TOKEN_SERVER_SKEY'] = packb(skey).hex()
+    return pkey
 
 
 @pytest_asyncio.fixture
@@ -25,23 +42,32 @@ async def connect_disconnect_db():
 
 
 @pytest_asyncio.fixture
-async def startup_and_shutdown_server():
-    server = UvicornTestServer('test.server_oauth2:app')
-    await server.up()
+async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
+    id_server = UvicornTestServer('test.server_oauth2:app', port=12345)
+    token_server = UvicornTestServer('tokenserver.main:app', port=TOKEN_SERVER_PORT)
+    await id_server.up()
+    await token_server.up()
     yield
-    await server.down()
+    await id_server.down()
+    await token_server.down()
 
 
 @pytest.mark.asyncio
-async def test_auth(startup_and_shutdown_server):
-    api = DsnetApi(URL('http://notused'), None, secret_key=b"dummy",
-                   oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback"))
+async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    await repository.save_token_server_key(packb(pkey))
+    api = DsnetApi(
+        URL('http://notused'),
+        repository,
+        secret_key=b"dummy",
+        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
+    )
     url, _ = api.start_auth('http://localhost:12345/authorize')
     assert url is not None    # will be displayed to user for use in browser
     returned_url = await authenticate(url, 'johndoe', 'secret')  # will be pasted by the user in ds client CLI
     await api.end_auth("http://localhost:12345/token", returned_url)
 
-    assert 1 == await api.fetch_pre_tokens(nb_tokens=3)
+    assert 0 == (await api.fetch_pre_tokens())
 
 
 async def authenticate(authorize_url, username, password) -> str:
