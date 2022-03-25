@@ -3,6 +3,8 @@ jobs:
   build:
     docker:
       - image: circleci/python:3.6
+      - image: redis:4.0.1-alpine
+        name: redis
       - image: docker.elastic.co/elasticsearch/elasticsearch:7.9.1
         environment:
           - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
