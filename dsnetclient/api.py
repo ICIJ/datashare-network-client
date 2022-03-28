@@ -179,7 +179,9 @@ class DsnetApi:
 
             # send challenges to server
             # retrieve pre-tokens from server
-            pretokens_resp = await self.oauth_client.post('/api/v2/dstokens/pretokens', content=packb(challenges))
+            pretokens_resp = await self.oauth_client.post('/api/v2/dstokens/pretokens',
+                                                          headers={'Content-Type': 'application/x-msgpack'},
+                                                          content=packb(challenges))
             pretokens: List[SignerResponseMessage] = unpackb(pretokens_resp.content)
             for pretoken, internal in zip(pretokens, challenges_internal):
                 token = abe_user.compute_signature(pretoken, internal)
