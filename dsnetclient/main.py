@@ -62,7 +62,7 @@ class Demo(AsyncCmd):
         """
         create OAuth2 authentication url and prints it to the console.
         """
-        url, state = self.api.start_auth("http://xemx:3001/oauth/authorize")
+        url, state = self.api.start_auth(str(self.api.oauth_client.base_url.join('/oauth/authorize')))
         print(f"copy this url ({url}) in your browser and authenticate. "
               f"Then call end_auth command with the resulting url")
         return False
@@ -216,7 +216,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, keys, entiti
     oauth_client = AsyncOAuth2Client(
         oauth_client_id,
         oauth_client_secret,
-        redirect_uri="http://localhost:4000/callback",
+        redirect_uri="http://localhost:8080/auth/xemx/callback",
         base_url=oauth_base_url
     )
 
