@@ -150,6 +150,9 @@ class DsnetApi:
     async def end_auth(self, token_endpoint: str, authorization_response: str):
         return await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
 
+    async def show_tokens(self) -> List[bytes]:
+        return await self.repository.get_tokens()
+
     async def fetch_pre_tokens(self) -> int:
         tokens: List[bytes] = []
         publickey_resp = await self.oauth_client.get('/api/v2/dstokens/publickey')

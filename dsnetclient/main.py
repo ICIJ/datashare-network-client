@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 from pathlib import Path
 from typing import List, Set, Optional
@@ -78,12 +79,21 @@ class Demo(AsyncCmd):
             print("Authentication failure! Please restart authentication process.")
         return False
 
-    async def do_tokens(self, _line: str):
+    async def do_get_tokens(self, _line: str):
         """
         get pretokens from token server and compute Abe blind tokens. They are stored in the local repository.
         """
         nb_tokens = await self.api.fetch_pre_tokens()
         print(f"retrieved {nb_tokens} token{'s' if nb_tokens > 1 else ''}")
+        return False
+
+    async def do_tokens(self, _line: str):
+        """
+        show tokens from the local repository.
+        """
+        tokens = await self.api.show_tokens()
+        for i, token in enumerate(tokens):
+            print(f"{i+1:02}: [32:64] {token.hex()[32:64]}")
         return False
 
     async def do_queries(self, _line: str) -> Optional[bool]:

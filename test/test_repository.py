@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 
 import databases
@@ -8,7 +7,6 @@ from dsnet.core import PigeonHole, Conversation
 from dsnet.crypto import gen_key_pair
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from sqlalchemy import create_engine
-from sscred import AbeParam
 
 from dsnetclient.models import metadata
 from dsnetclient.repository import SqlalchemyRepository, Peer
@@ -267,3 +265,10 @@ async def test_save_tokens(connect_disconnect_db):
     assert await repository.pop_token() in tokens
     assert await repository.pop_token() in tokens
     assert await repository.pop_token() is None
+
+
+@pytest.mark.asyncio
+async def test_get_tokens(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    await repository.save_tokens([b"foo", b"bar", b"baz"])
+    assert await repository.get_tokens() == [b"foo", b"bar", b"baz"]

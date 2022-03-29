@@ -164,6 +164,13 @@ class Repository(metaclass=abc.ABCMeta):
         :return: token binary
         """
 
+    @abc.abstractmethod
+    async def get_tokens(self) -> List[bytes]:
+        """
+        show stored tokens
+        :return: list of token binary
+        """
+
 
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
@@ -364,3 +371,5 @@ class SqlalchemyRepository(Repository):
             await self.database.execute(stmt)
             return row['token']
 
+    async def get_tokens(self) -> List[bytes]:
+        return [r['token'] for r in await self.database.fetch_all(token_table.select())]
