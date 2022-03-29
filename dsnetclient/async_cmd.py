@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import traceback
 from cmd import Cmd
 
 from aioconsole import ainput
@@ -91,7 +92,11 @@ class AsyncCmd(Cmd):
                 func = getattr(self, 'do_' + cmd)
             except AttributeError:
                 return self.default(line)
-            return await func(arg)
+            try:
+                return await func(arg)
+            except:
+                traceback.print_exception(*sys.exc_info())
+                return False
 
     async def async_emptyline(self) -> bool:
         return False
