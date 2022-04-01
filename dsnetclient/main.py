@@ -93,7 +93,7 @@ class Demo(AsyncCmd):
         """
         tokens = await self.api.show_tokens()
         for i, token in enumerate(tokens):
-            print(f"{i+1:02}: [32:64] {token.hex()[32:64]}")
+            print(f"{i+1:02}: [32:64] {token.hex()[32:64]} {len(token)}")
         return False
 
     async def do_queries(self, _line: str) -> Optional[bool]:

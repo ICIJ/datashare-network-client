@@ -56,6 +56,7 @@ serverkey_table = Table(
 token_table = Table(
     "token",
     metadata,
-    Column("token", LargeBinary, primary_key=True),
+    Column("secret_key", LargeBinary, primary_key=True),
+    Column("token", LargeBinary, nullable=False),
     Column('timestamp', DateTime, nullable=False)
 )

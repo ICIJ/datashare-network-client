@@ -3,7 +3,7 @@ import datetime
 import sqlite3
 from collections import defaultdict
 from operator import attrgetter
-from typing import List, Mapping, Optional
+from typing import List, Mapping, Optional, NamedTuple
 
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
@@ -151,21 +151,21 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def save_tokens(self, tokens: List[bytes]) -> int:
+    async def save_tokens(self, tokens: List[AbeToken]) -> int:
         """
         Save query tokens
         :return: True if saved else False
         """
 
     @abc.abstractmethod
-    async def pop_token(self) -> bytes:
+    async def pop_token(self) -> AbeToken:
         """
         pop a query token from the database
         :return: token binary
         """
 
     @abc.abstractmethod
-    async def get_tokens(self) -> List[bytes]:
+    async def get_tokens(self) -> List[AbeToken]:
         """
         show stored tokens
         :return: list of token binary
@@ -356,12 +356,18 @@ class SqlalchemyRepository(Repository):
         row = await self.database.fetch_one(stmt)
         return row['master_key'] if row else None
 
-    async def save_tokens(self, tokens: List[bytes]) -> int:
-        data = [{"token": token, "timestamp": datetime.datetime.utcnow()} for token in tokens]
+    async def save_tokens(self, tokens: List[AbeToken]) -> int:
+        data = [
+            {
+                "token": abe_token.token,
+                "secret_key": abe_token.secret_key,
+                "timestamp": datetime.datetime.utcnow()
+            } for abe_token in tokens
+        ]
         stmt = insert(token_table).values(data)
         return await self.database.execute(stmt)
 
-    async def pop_token(self) -> Optional[bytes]:
+    async def pop_token(self) -> Optional[AbeToken]:
         async with self.database.transaction():
             first = token_table.select().order_by(desc(token_table.c.timestamp)).limit(1)
             row = await self.database.fetch_one(first)
@@ -369,7 +375,7 @@ class SqlalchemyRepository(Repository):
                 return None
             stmt = token_table.delete().where(token_table.c.token == row["token"])
             await self.database.execute(stmt)
-            return row['token']
+            return AbeToken(row["secret_key"], row['token'])
 
-    async def get_tokens(self) -> List[bytes]:
-        return [r['token'] for r in await self.database.fetch_all(token_table.select())]
+    async def get_tokens(self) -> List[AbeToken]:
+        return [AbeToken(r['secret_key'], r['token']) for r in await self.database.fetch_all(token_table.select())]

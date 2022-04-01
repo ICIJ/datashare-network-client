@@ -1,4 +1,5 @@
 import re
+from typing import List
 from unittest.mock import Mock
 
 import databases
@@ -9,13 +10,14 @@ from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage
 from pytest_httpserver import HTTPServer
 from pytest_httpserver.httpserver import HandlerType
 from sqlalchemy import create_engine
+from sscred import AbeParam, AbeUser, AbeSigner, BlindedChallengeMessage, unpackb, packb
 from werkzeug import Response
 from yarl import URL
 
-from dsnetclient.api import DsnetApi
+from dsnetclient.api import DsnetApi, NoTokenException
 from dsnetclient.index import MemoryIndex, Index
 from dsnetclient.models import metadata
-from dsnetclient.repository import SqlalchemyRepository, Peer
+from dsnetclient.repository import SqlalchemyRepository, Peer, AbeToken
 
 DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
@@ -29,6 +31,14 @@ async def connect_disconnect_db():
     yield
     metadata.drop_all(engine)
     await database.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_send_query_no_tokens(httpserver: HTTPServer, connect_disconnect_db):
+    api = await create_api(httpserver, number_tokens=0)
+
+    with pytest.raises(NoTokenException):
+        await api.send_query(b'raw query')
 
 
 @pytest.mark.asyncio
@@ -155,10 +165,15 @@ async def test_send_message(httpserver: HTTPServer, connect_disconnect_db):
     assert conversations[0].nb_recv_messages == 0
 
 
-async def create_api(httpserver, index = None):
+async def create_api(httpserver, index = None, number_tokens=3):
     my_keys = gen_key_pair()
     other = gen_key_pair()
     repository = SqlalchemyRepository(database)
     await repository.save_peer(Peer(other.public))
     api = DsnetApi(URL(httpserver.url_for('/')), repository, secret_key=my_keys.secret, index=index)
+    if number_tokens:
+        tokens = await create_tokens(api, number_tokens)
+        await repository.save_tokens(tokens)
     return api
+
+
