@@ -141,7 +141,8 @@ class DsnetApi:
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
         local_query = await self.repository.get_conversation_by_key(msg.public_key)
-        if local_query is None:
+        server_key: AbePublicKey = await self.repository.get_token_server_key()
+        if local_query is None and msg.validate(server_key):
             results = await self.index.search(msg.payload)
             await self.send_response(msg.public_key, results)
 
@@ -159,8 +160,8 @@ class DsnetApi:
         server_public_key_raw = publickey_resp.content
         local_key = await self.repository.get_token_server_key()
 
-        if server_public_key_raw != local_key:
-            server_key: AbePublicKey = unpackb(server_public_key_raw)
+        server_key: AbePublicKey = unpackb(server_public_key_raw)
+        if server_key != local_key:
             commitments_resp = await self.oauth_client.post('/api/v2/dstokens/commitments')
             commitments: List[SignerCommitMessage] = unpackb(commitments_resp.content)
 
@@ -175,7 +176,7 @@ class DsnetApi:
             tokens = generate_tokens(server_key, challenges_internal, token_secret_keys, pretokens)
 
             # bulk insert tokens in DB
-            await self.repository.save_token_server_key(server_public_key_raw)
+            await self.repository.save_token_server_key(server_key)
             await self.repository.save_tokens(tokens)
 
             return len(tokens)

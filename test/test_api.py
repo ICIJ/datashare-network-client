@@ -94,6 +94,20 @@ async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disc
 
 
 @pytest.mark.asyncio
+async def test_receive_query_wrong_signature(httpserver: HTTPServer, connect_disconnect_db):
+    api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
+    token = await api.repository.pop_token()
+    query = Query.create(gen_key_pair().public, token,  b'foo')
+    query.signature = b"Wrong signature"
+
+    await api.handle_query(query)
+
+    httpserver.check()
+    conversations = await api.repository.get_conversations()
+    assert len(conversations) == 0
+
+
+@pytest.mark.asyncio
 async def test_do_not_treat_my_own_query(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     mocked_index = Mock(Index)
@@ -174,6 +188,7 @@ async def create_api(httpserver, index=None, number_tokens=3):
     await repository.save_peer(Peer(other.public))
     api = DsnetApi(URL(httpserver.url_for('/')), repository, secret_key=my_keys.secret, index=index)
     if number_tokens:
-        tokens = create_tokens(number_tokens)
+        tokens, server_key = create_tokens(number_tokens)
         await repository.save_tokens(tokens)
+        await repository.save_token_server_key(server_key)
     return api
