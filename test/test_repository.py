@@ -263,7 +263,7 @@ async def test_save_token_server_key(connect_disconnect_db):
 @pytest.mark.asyncio
 async def test_save_tokens(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    tokens = create_tokens(3)
+    tokens, _ = create_tokens(3)
     assert await repository.save_tokens(tokens) == 3
     assert await repository.pop_token() in tokens
     assert await repository.pop_token() in tokens
@@ -274,7 +274,7 @@ async def test_save_tokens(connect_disconnect_db):
 @pytest.mark.asyncio
 async def test_get_tokens(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    tokens = create_tokens(3)
+    tokens, _ = create_tokens(3)
 
     await repository.save_tokens(tokens)
     assert await repository.get_tokens() == tokens

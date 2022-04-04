@@ -52,7 +52,9 @@ async def test_root(startup_and_shutdown_server):
 @pytest.mark.timeout(5)
 async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    await repository.save_tokens(create_tokens(1))
+    tokens, pk = create_tokens(1)
+    await repository.save_tokens(tokens)
+    await repository.save_token_server_key(pk)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
 
@@ -89,7 +91,9 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
 @pytest.mark.timeout(5)
 async def test_websocket_reconnect(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    await repository.save_tokens(create_tokens(1))
+    tokens, pk = create_tokens(1)
+    await repository.save_tokens(tokens)
+    await repository.save_token_server_key(pk)
     local_server = UvicornTestServer('dsnetserver.main:app', port=23456)
     await local_server.up()
 
@@ -119,7 +123,9 @@ async def test_websocket_reconnect(connect_disconnect_db):
 @pytest.mark.timeout(5)
 async def test_send_response(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    await repository.save_tokens(create_tokens(1))
+    tokens, pk = create_tokens(1)
+    await repository.save_tokens(tokens)
+    await repository.save_token_server_key(pk)
     keys_alice = gen_key_pair()
     keys_bob = gen_key_pair()
     await repository.save_peer(Peer(keys_alice.public))

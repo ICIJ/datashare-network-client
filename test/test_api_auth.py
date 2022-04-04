@@ -57,7 +57,7 @@ async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
 @pytest.mark.asyncio
 async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
-    await repository.save_token_server_key(packb(pkey))
+    await repository.save_token_server_key(pkey)
     api = DsnetApi(
         URL('http://notused'),
         repository,
@@ -87,7 +87,7 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
 
     assert 3 == await api.fetch_pre_tokens()
 
-    server_key: AbePublicKey = unpackb(await repository.get_token_server_key())
+    server_key: AbePublicKey = await repository.get_token_server_key()
     assert server_key is not None
     assert isinstance(server_key, AbePublicKey)
 
