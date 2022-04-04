@@ -9,7 +9,8 @@ from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from sqlalchemy import create_engine
 
 from dsnetclient.models import metadata
-from dsnetclient.repository import SqlalchemyRepository, Peer, AbeToken
+from dsnetclient.repository import SqlalchemyRepository, Peer
+from test.test_utils import create_tokens
 
 DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
@@ -259,7 +260,7 @@ async def test_save_token_server_key(connect_disconnect_db):
 @pytest.mark.asyncio
 async def test_save_tokens(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    tokens = [AbeToken(b"s_riri", b"riri"), AbeToken(b"s_fifi",b"fifi"), AbeToken(b"s_loulou",b"loulou")]
+    tokens = create_tokens(3)
     assert await repository.save_tokens(tokens) == 3
     assert await repository.pop_token() in tokens
     assert await repository.pop_token() in tokens
@@ -270,5 +271,7 @@ async def test_save_tokens(connect_disconnect_db):
 @pytest.mark.asyncio
 async def test_get_tokens(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    await repository.save_tokens([AbeToken(b"s_foo", b"foo"), AbeToken(b"s_bar", b"bar"), AbeToken(b"s_baz", b"baz")])
-    assert await repository.get_tokens() == [AbeToken(b"s_foo", b"foo"), AbeToken(b"s_bar", b"bar"), AbeToken(b"s_baz", b"baz")]
+    tokens = create_tokens(3)
+
+    await repository.save_tokens(tokens)
+    assert await repository.get_tokens() == tokens

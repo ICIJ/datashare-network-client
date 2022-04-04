@@ -5,8 +5,9 @@ import httpx
 import pytest
 import pytest_asyncio
 from authlib.integrations.httpx_client import AsyncOAuth2Client
+from dsnet.token import AbeToken
 from sqlalchemy import create_engine
-from sscred.blind_signature import AbeParam, AbeSignature, AbePublicKey
+from sscred.blind_signature import AbeParam, AbePublicKey
 from sscred.pack import packb, unpackb
 from yarl import URL
 
@@ -90,9 +91,9 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     assert server_key is not None
     assert isinstance(server_key, AbePublicKey)
 
-    token: AbeSignature = unpackb(await repository.pop_token())
-    assert isinstance(token, AbeSignature)
-    assert server_key.verify_signature(token)
+    token: AbeToken = await repository.pop_token()
+    assert isinstance(token, AbeToken)
+    assert server_key.verify_signature(token.token)
 
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is not None

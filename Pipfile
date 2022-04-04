@@ -4,29 +4,29 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = '==0.9.2'
-aiohttp = '*'
-click = '*'
-aioconsole = '*'
+datashare-network-core = '==0.13.0'
+aiohttp = "==3.8.1"
+click = "==8.0.4"
+aioconsole = "==0.4.1"
 elasticsearch = '==7.9.1'
-Authlib = '*'
-httpx = '*'
-sscred = '0.2.0'
+Authlib = "==1.0.0"
+httpx = "*"
+sscred = '==0.2.1'
 
 [dev-packages]
-pytest-httpserver = "*"
-alembic = "*"
+pytest-httpserver = "==1.0.4"
+alembic = "==1.7.7"
 datashare-network-server = "==0.4.0"
-uvicorn = {extras = ["standard"], version = "*"}
-pytest = '*'
-pytest-asyncio = '*'
-pytest-timeout = '*'
+uvicorn = {extras = ["standard"], version = "==0.15.0"}
+pytest = "==7.1.0"
+pytest-asyncio = "==0.18.2"
+pytest-timeout = "==2.1.0"
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
 twine = "==3.2.0"
-fastapi = {extras = ["all"], version = "*"}
-fastapi-sessions = "*"
-datashare-network-tokenserver= "0.1.1"
+fastapi = {extras = ["all"], version = "==0.75.0"}
+fastapi-sessions = "==0.3.2"
+datashare-network-tokenserver= "==0.1.2"
 
 [requires]
 python_version = "3"

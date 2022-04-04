@@ -1,5 +1,4 @@
 import re
-from typing import List
 from unittest.mock import Mock
 
 import databases
@@ -10,14 +9,14 @@ from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage
 from pytest_httpserver import HTTPServer
 from pytest_httpserver.httpserver import HandlerType
 from sqlalchemy import create_engine
-from sscred import AbeParam, AbeUser, AbeSigner, BlindedChallengeMessage, unpackb, packb
 from werkzeug import Response
 from yarl import URL
 
 from dsnetclient.api import DsnetApi, NoTokenException
 from dsnetclient.index import MemoryIndex, Index
 from dsnetclient.models import metadata
-from dsnetclient.repository import SqlalchemyRepository, Peer, AbeToken
+from dsnetclient.repository import SqlalchemyRepository, Peer
+from test.test_utils import create_tokens
 
 DATABASE_URL = 'sqlite:///dsnet.db'
 database = databases.Database(DATABASE_URL)
@@ -71,8 +70,9 @@ async def test_send_response(httpserver: HTTPServer, connect_disconnect_db):
 async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
+    token = await api.repository.pop_token()
 
-    await api.handle_query(Query(gen_key_pair().public, b'foo'))
+    await api.handle_query(Query.create(gen_key_pair().public, token,  b'foo'))
 
     httpserver.check()
     conversations = await api.repository.get_conversations()
@@ -84,8 +84,9 @@ async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_
 async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver, MemoryIndex(set()))
+    token = await api.repository.pop_token()
 
-    await api.handle_query(Query(gen_key_pair().public, b'foo'))
+    await api.handle_query(Query.create(gen_key_pair().public, token,  b'foo'))
 
     httpserver.check()
     conv = (await api.repository.get_conversations())[0]
@@ -97,10 +98,11 @@ async def test_do_not_treat_my_own_query(httpserver: HTTPServer, connect_disconn
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     mocked_index = Mock(Index)
     api = await create_api(httpserver, mocked_index)
+    token = await api.repository.pop_token()
 
     await api.send_query(b'foo')
     conv = (await api.repository.get_conversations())[0]
-    await api.handle_query(Query(conv.public_key, b'foo'))
+    await api.handle_query(Query.create(conv.public_key, token, b'foo'))
 
     mocked_index.search.assert_not_called()
 
@@ -165,15 +167,13 @@ async def test_send_message(httpserver: HTTPServer, connect_disconnect_db):
     assert conversations[0].nb_recv_messages == 0
 
 
-async def create_api(httpserver, index = None, number_tokens=3):
+async def create_api(httpserver, index=None, number_tokens=3):
     my_keys = gen_key_pair()
     other = gen_key_pair()
     repository = SqlalchemyRepository(database)
     await repository.save_peer(Peer(other.public))
     api = DsnetApi(URL(httpserver.url_for('/')), repository, secret_key=my_keys.secret, index=index)
     if number_tokens:
-        tokens = await create_tokens(api, number_tokens)
+        tokens = create_tokens(number_tokens)
         await repository.save_tokens(tokens)
     return api
-
-

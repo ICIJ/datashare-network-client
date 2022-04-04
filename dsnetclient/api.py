@@ -5,18 +5,14 @@ from typing import Awaitable, Callable, Tuple, List
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from authlib.integrations.httpx_client import AsyncOAuth2Client
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from dsnet.core import Conversation, Query
-from dsnet.crypto import gen_key_pair
+from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
 from dsnet.message import Message, MessageType, PigeonHoleNotification, PigeonHoleMessage
+from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
 from sscred import (
-    AbeUser,
     AbePublicKey,
-    BlindedChallengeMessage,
-    UserBlindedChallengeInternalParameters,
     SignerCommitMessage,
     SignerResponseMessage,
     packb,
@@ -26,7 +22,7 @@ from yarl import URL
 
 from dsnetclient.index import Index, MemoryIndex
 from dsnetclient.models import metadata
-from dsnetclient.repository import Repository, SqlalchemyRepository, AbeToken
+from dsnetclient.repository import Repository, SqlalchemyRepository
 
 
 class NoTokenException(Exception):
@@ -51,20 +47,18 @@ class DsnetApi:
                 return await resp.json()
 
     async def send_query(self, query: bytes) -> None:
+        query_keys = gen_key_pair()
+        public_key = get_public_key(self.secret_key)
         abe_token = await self.repository.pop_token()
         if abe_token is None:
             raise NoTokenException()
-        secret_key: bytes = abe_token.secret_key
-        public_key: bytes = unpackb(abe_token.token).message
-
-        #query_signature = sign_message(secret_key, query)
 
         for peer in await self.repository.peers():
             if peer.public_key != public_key:
-                conv = Conversation.create_from_querier(secret_key, peer.public_key, query)
+                conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query)
                 await self.repository.save_conversation(conv)
 
-        payload = Query(public_key, query).to_bytes()
+        payload = Query.create(query_keys.public, abe_token, query).to_bytes()
         async with ClientSession() as session:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
@@ -158,25 +152,27 @@ class DsnetApi:
         return await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
 
     async def show_tokens(self) -> List[bytes]:
-        return [abe_token.token for abe_token in await self.repository.get_tokens()]
+        return [packb(abe_token.token) for abe_token in await self.repository.get_tokens()]
 
     async def fetch_pre_tokens(self) -> int:
         publickey_resp = await self.oauth_client.get('/api/v2/dstokens/publickey')
         server_public_key_raw = publickey_resp.content
         local_key = await self.repository.get_token_server_key()
 
-        async def pretokens_cb(challenges: List[BlindedChallengeMessage]):
-            resp = await self.oauth_client.post(
+        if server_public_key_raw != local_key:
+            server_key: AbePublicKey = unpackb(server_public_key_raw)
+            commitments_resp = await self.oauth_client.post('/api/v2/dstokens/commitments')
+            commitments: List[SignerCommitMessage] = unpackb(commitments_resp.content)
+
+            challenges, challenges_internal, token_secret_keys = generate_challenges(server_key, commitments)
+
+            pretoken_resp = await self.oauth_client.post(
                 '/api/v2/dstokens/pretokens',
                 headers={'Content-Type': 'application/x-msgpack'},
                 content=packb(challenges)
             )
-            return unpackb(resp.content)
-
-        if server_public_key_raw != local_key:
-            commitments_resp = await self.oauth_client.post('/api/v2/dstokens/commitments')
-            commitments: List[SignerCommitMessage] = unpackb(commitments_resp.content)
-            tokens = await self.generate_tokens(server_public_key_raw, commitments, pretokens_cb)
+            pretokens: List[SignerResponseMessage] = unpackb(pretoken_resp.content)
+            tokens = generate_tokens(server_key, challenges_internal, token_secret_keys, pretokens)
 
             # bulk insert tokens in DB
             await self.repository.save_token_server_key(server_public_key_raw)
@@ -184,7 +180,6 @@ class DsnetApi:
 
             return len(tokens)
         return 0
-
 
 
 def main():

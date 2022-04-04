@@ -5,12 +5,16 @@ from collections import defaultdict
 from operator import attrgetter
 from typing import List, Mapping, Optional, NamedTuple
 
+from cryptography.hazmat.primitives._serialization import Encoding, PrivateFormat, NoEncryption
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
 from dsnet.logger import logger
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
+from dsnet.token import AbeToken
 from sqlalchemy import insert, select, column, delete, desc
 from sqlalchemy.sql import Select
+from sscred import packb, unpackb
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, token_table
 
@@ -359,8 +363,8 @@ class SqlalchemyRepository(Repository):
     async def save_tokens(self, tokens: List[AbeToken]) -> int:
         data = [
             {
-                "token": abe_token.token,
-                "secret_key": abe_token.secret_key,
+                "token": packb(abe_token.token),
+                "secret_key": abe_token.secret_key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()),
                 "timestamp": datetime.datetime.utcnow()
             } for abe_token in tokens
         ]
@@ -375,7 +379,8 @@ class SqlalchemyRepository(Repository):
                 return None
             stmt = token_table.delete().where(token_table.c.token == row["token"])
             await self.database.execute(stmt)
-            return AbeToken(row["secret_key"], row['token'])
+            return AbeToken(Ed25519PrivateKey.from_private_bytes(row["secret_key"]), unpackb(row['token']))
 
     async def get_tokens(self) -> List[AbeToken]:
-        return [AbeToken(r['secret_key'], r['token']) for r in await self.database.fetch_all(token_table.select())]
+        return [AbeToken(Ed25519PrivateKey.from_private_bytes(r['secret_key']), unpackb(r['token']))
+                for r in await self.database.fetch_all(token_table.select())]
