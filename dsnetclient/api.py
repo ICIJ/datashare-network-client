@@ -108,7 +108,7 @@ class DsnetApi:
                 await asyncio.sleep(self.reconnect_delay_seconds)
             except Exception as e:
                 nb_errors += 1
-                logger.error(e)
+                logger.exception(e)
                 if nb_errors >= nb_max_errors:
                     raise e
 

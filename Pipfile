@@ -16,7 +16,7 @@ sscred = '==0.2.1'
 [dev-packages]
 pytest-httpserver = "==1.0.4"
 alembic = "==1.7.7"
-datashare-network-server = "==0.4.0"
+datashare-network-server = "==0.6.0"
 uvicorn = {extras = ["standard"], version = "==0.15.0"}
 pytest = "==7.1.0"
 pytest-asyncio = "==0.18.2"
