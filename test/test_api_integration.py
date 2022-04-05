@@ -2,6 +2,7 @@ import asyncio
 from asyncio import Event
 
 import databases
+import dsnet
 import dsnetserver
 import pytest
 import pytest_asyncio
@@ -44,8 +45,10 @@ async def startup_and_shutdown_server():
 
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
-    assert await DsnetApi(URL('http://localhost:12345'), None, secret_key=b"dummy").get_server_version() == {
-        'message': f'Datashare Network Server version {dsnetserver.__version__}'}
+    assert await DsnetApi(URL('http://localhost:12345'), None, secret_key=b"dummy").get_server_version() == \
+           {'message': f'Datashare Network Server version {dsnetserver.__version__}',
+            'core_version': dsnet.__version__,
+            'server_version': dsnetserver.__version__}
 
 
 @pytest.mark.asyncio

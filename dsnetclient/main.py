@@ -6,6 +6,7 @@ from typing import List, Set, Optional
 
 import click
 import databases
+import dsnet
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dsnet.crypto import get_public_key, gen_key_pair
 from dsnet.logger import add_stdout_handler
@@ -47,7 +48,7 @@ class Demo(AsyncCmd):
         display client/server version of datashare network
         """
         server_version = await self.api.get_server_version()
-        print(f"client {__version__} with {server_version['message']}")
+        print(f"client {__version__} (core {dsnet.__version__}) with {server_version['message']} (core {server_version['core_version']})")
         return False
 
     async def do_query(self, line: str) -> Optional[bool]:
