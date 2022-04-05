@@ -49,7 +49,7 @@ async def test_send_query(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.check()
 
     conversations = await api.repository.get_conversations()
-    assert len(conversations) == 1
+    assert len(conversations) == 2
     assert conversations[0].query == b'raw query'
 
 
@@ -108,17 +108,17 @@ async def test_receive_query_wrong_signature(httpserver: HTTPServer, connect_dis
 
 
 @pytest.mark.asyncio
-async def test_do_not_treat_my_own_query(httpserver: HTTPServer, connect_disconnect_db):
+async def test_do_treat_my_own_query(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
-    mocked_index = Mock(Index)
-    api = await create_api(httpserver, mocked_index)
-    token = await api.repository.pop_token()
+    api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
 
     await api.send_query(b'foo')
-    conv = (await api.repository.get_conversations())[0]
-    await api.handle_query(Query.create(conv.public_key, token, b'foo'))
 
-    mocked_index.search.assert_not_called()
+    httpserver.check()
+    conversations = await api.repository.get_conversations()
+    assert len(conversations) == 2
+    assert conversations[0].nb_sent_messages == 1
+    assert conversations[1].nb_sent_messages == 1
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,7 @@ async def test_receive_ph_notification_with_matching_address_as_querier(httpserv
 
     httpserver.check()
     conversations = await api.repository.get_conversations()
-    assert len(conversations) == 1
+    assert len(conversations) == 2
     assert conversations[0].nb_sent_messages == 1
     assert conversations[0].nb_recv_messages == 1
 
@@ -176,7 +176,7 @@ async def test_send_message(httpserver: HTTPServer, connect_disconnect_db):
 
     httpserver.check()
     conversations = await api.repository.get_conversations()
-    assert len(conversations) == 1
+    assert len(conversations) == 2
     assert conversations[0].nb_sent_messages == 2
     assert conversations[0].nb_recv_messages == 0
 
@@ -186,6 +186,7 @@ async def create_api(httpserver, index=None, number_tokens=3):
     other = gen_key_pair()
     repository = SqlalchemyRepository(database)
     await repository.save_peer(Peer(other.public))
+    await repository.save_peer(Peer(my_keys.public))
     api = DsnetApi(URL(httpserver.url_for('/')), repository, secret_key=my_keys.secret, index=index)
     if number_tokens:
         tokens, server_key = create_tokens(number_tokens)

@@ -48,15 +48,13 @@ class DsnetApi:
 
     async def send_query(self, query: bytes) -> None:
         query_keys = gen_key_pair()
-        public_key = get_public_key(self.secret_key)
         abe_token = await self.repository.pop_token()
         if abe_token is None:
             raise NoTokenException()
 
         for peer in await self.repository.peers():
-            if peer.public_key != public_key:
-                conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query)
-                await self.repository.save_conversation(conv)
+            conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query)
+            await self.repository.save_conversation(conv)
 
         payload = Query.create(query_keys.public, abe_token, query).to_bytes()
         async with ClientSession() as session:
@@ -140,11 +138,12 @@ class DsnetApi:
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
-        local_query = await self.repository.get_conversation_by_key(msg.public_key)
         server_key: AbePublicKey = await self.repository.get_token_server_key()
-        if local_query is None and msg.validate(server_key):
+        if msg.validate(server_key):
             results = await self.index.search(msg.payload)
             await self.send_response(msg.public_key, results)
+        else:
+            logger.warning(f"invalid query's signature {msg.public_key.hex()}")
 
     def start_auth(self, authorize_url: str) -> Tuple[str, str]:
         return self.oauth_client.create_authorization_url(authorize_url)
