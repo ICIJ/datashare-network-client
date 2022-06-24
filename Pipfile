@@ -20,6 +20,7 @@ datashare-network-server = "==0.7.0"
 uvicorn = {extras = ["standard"], version = "==0.15.0"}
 pytest = "==7.1.0"
 pytest-asyncio = "==0.18.2"
+looptime = "*"
 pytest-timeout = "==2.1.0"
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
