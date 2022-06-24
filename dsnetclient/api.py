@@ -21,6 +21,7 @@ from sscred import (
 from yarl import URL
 
 from dsnetclient.index import Index, MemoryIndex
+from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -72,10 +73,7 @@ class DsnetApi:
     async def _send_message(self, conversation: Conversation, message: bytes) -> None:
         response = conversation.create_response(message)
         await self.repository.save_conversation(conversation)
-
-        async with ClientSession() as session:
-            async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.to_bytes()) as http_response:
-                http_response.raise_for_status()
+        await DirectMessageSender(self.base_url).send(response)
 
     async def close(self):
         self.stop = True
