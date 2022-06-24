@@ -12,6 +12,7 @@ from sscred.pack import packb, unpackb
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
+from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository
 from test.server import UvicornTestServer
@@ -58,9 +59,11 @@ async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
 async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
     await repository.save_token_server_key(pkey)
+    url = URL('http://notused')
     api = DsnetApi(
-        URL('http://notused'),
+        url,
         repository,
+        message_sender=DirectMessageSender(url),
         secret_key=b"dummy",
         oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
     )
@@ -75,9 +78,11 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
 @pytest.mark.asyncio
 async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
+    url = URL('http://notused')
     api = DsnetApi(
-        URL('http://notused'),
+        url,
         repository,
+        message_sender=DirectMessageSender(url),
         secret_key=b"dummy",
         oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
     )

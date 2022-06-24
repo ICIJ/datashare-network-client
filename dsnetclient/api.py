@@ -21,7 +21,7 @@ from sscred import (
 from yarl import URL
 
 from dsnetclient.index import Index, MemoryIndex
-from dsnetclient.message_sender import DirectMessageSender
+from dsnetclient.message_sender import MessageSender
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -31,7 +31,8 @@ class NoTokenException(Exception):
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, secret_key: bytes, reconnect_delay_seconds=2,
+    def __init__(self, url: URL, repository: Repository, secret_key: bytes,
+                 message_sender: MessageSender, reconnect_delay_seconds=2,
                  index: Index = None, oauth_client: AsyncOAuth2Client = None) -> None:
         self.repository = repository
         self.base_url = url
@@ -41,6 +42,7 @@ class DsnetApi:
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
+        self.message_sender = message_sender
 
     async def get_server_version(self) -> dict:
         async with ClientSession() as session:
@@ -73,7 +75,7 @@ class DsnetApi:
     async def _send_message(self, conversation: Conversation, message: bytes) -> None:
         response = conversation.create_response(message)
         await self.repository.save_conversation(conversation)
-        await DirectMessageSender(self.base_url).send(response)
+        await self.message_sender.send(response)
 
     async def close(self):
         self.stop = True
