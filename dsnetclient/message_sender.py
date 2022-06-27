@@ -1,6 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
-from asyncio import Queue
+from asyncio import Queue, AbstractEventLoop
 from typing import Awaitable, Callable
 
 from aiohttp import ClientSession
@@ -34,7 +34,8 @@ class QueueMessageSender(MessageSender):
 
     def __init__(self, base_url, distribution_fn: Callable[[], float],
                  send_fn: Callable[[PigeonHoleMessage], Awaitable[None]] = None,
-                 cover_fn: Callable[[None], PigeonHoleMessage] = None
+                 cover_fn: Callable[[None], PigeonHoleMessage] = None,
+                 event_loop: AbstractEventLoop = None
         ):
         self.base_url = base_url
         self.queue = Queue()
@@ -42,7 +43,8 @@ class QueueMessageSender(MessageSender):
         self.send_fn = self._default_send_fn if send_fn is None else send_fn
         self.cover_fn = self._default_cover_fn if cover_fn is None else cover_fn
         self.distribution_fn = distribution_fn
-        self._message_sender = asyncio.get_event_loop().create_task(self._send_coroutine())
+        self._event_loop = asyncio.get_event_loop() if event_loop is None else event_loop
+        self._message_sender = self._event_loop.create_task(self._send_coroutine())
 
     async def send(self, message: PigeonHoleMessage) -> None:
         await self.queue.put(message)

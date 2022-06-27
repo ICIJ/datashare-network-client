@@ -1,9 +1,10 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock
 
+import async_solipsism
 import pytest
-from dsnet.message import PigeonHoleMessage
 from yarl import URL
+from dsnet.message import PigeonHoleMessage
 
 from dsnetclient.message_sender import QueueMessageSender
 
@@ -12,9 +13,14 @@ def const_distribution() -> float:
     return 4.0
 
 
-@pytest.mark.skip()
+@pytest.fixture
+def event_loop():
+    loop = async_solipsism.EventLoop()
+    yield loop
+    loop.close()
+
+
 @pytest.mark.asyncio
-@pytest.mark.looptime
 async def test_server_called_if_cover_sent():
     send_fn = AsyncMock()
     cover_fn = Mock()
@@ -29,13 +35,12 @@ async def test_server_called_if_cover_sent():
     assert send_fn.call_count == cover_fn.call_count == 3
 
 
-@pytest.mark.skip()
 @pytest.mark.asyncio
-@pytest.mark.looptime
 async def test_server_called_with_distribution_fn_sleep():
     send_fn = AsyncMock()
     qms = QueueMessageSender(URL(), const_distribution, send_fn)
 
+    start = asyncio.get_running_loop().time()
     message = PigeonHoleMessage(b'address', b'payload', b'from_key')
     await qms.send(message)
     while not qms.queue.empty():
@@ -44,6 +49,4 @@ async def test_server_called_with_distribution_fn_sleep():
     await qms.stop()
 
     assert send_fn.call_count == 2
-    assert asyncio.get_running_loop().time() == 8.0
-
-
+    assert asyncio.get_running_loop().time() - start == 8.0
