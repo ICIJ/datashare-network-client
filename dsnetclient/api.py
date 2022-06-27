@@ -65,14 +65,15 @@ class DsnetApi:
                 response.raise_for_status()
 
     async def send_response(self, public_key: bytes, response_data: bytes) -> None:
-        conv = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key)
-        await self._send_message(conv, response_data)
+        conversation = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key)
+        response = conversation.create_response(response_data)
+        await self.repository.save_conversation(conversation)
+        async with ClientSession() as session:
+            async with session.post(self.base_url.join(URL(f'/ph/{response.address.hex()}')), data=response.to_bytes()) as http_response:
+                http_response.raise_for_status()
 
     async def send_message(self, conversation_id: int, message: bytes) -> None:
-        conv = await self.repository.get_conversation(conversation_id)
-        await self._send_message(conv, message)
-
-    async def _send_message(self, conversation: Conversation, message: bytes) -> None:
+        conversation = await self.repository.get_conversation(conversation_id)
         response = conversation.create_response(message)
         await self.repository.save_conversation(conversation)
         await self.message_sender.send(response)
