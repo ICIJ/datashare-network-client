@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
+from dsnetclient.message_retriever import ExactMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository, Peer
@@ -46,7 +47,14 @@ async def startup_and_shutdown_server():
 
 @pytest.mark.asyncio
 async def test_root(startup_and_shutdown_server):
-    assert await DsnetApi(URL('http://localhost:12345'), None, secret_key=b"dummy", message_sender=DirectMessageSender(URL('http://localhost:12345'))).get_server_version() == \
+    url = URL('http://localhost:12345')
+    assert await DsnetApi(
+            url,
+            None,
+            secret_key=b"dummy",
+            message_retriever=ExactMatchMessageRetriever(url, None),
+            message_sender=DirectMessageSender(url)
+        ).get_server_version() == \
            {'message': f'Datashare Network Server version {dsnetserver.__version__}',
             'core_version': dsnet.__version__,
             'server_version': dsnetserver.__version__}
@@ -70,7 +78,14 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
         assert message.payload == b'payload_value'
         cb_called.set()
 
-    api = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys.secret, message_sender=DirectMessageSender(URL('http://localhost:12345')))
+    url = URL('http://localhost:12345')
+    api = DsnetApi(
+        url,
+        repository,
+        secret_key=keys.secret,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url)
+    )
     api.background_listening(cb)
     await api.send_query(b'payload_value')
 
@@ -84,7 +99,14 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
-    api = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys.secret, message_sender=DirectMessageSender(URL('http://localhost:12345')))
+    url = URL('http://localhost:12345')
+    api = DsnetApi(
+        url,
+        repository,
+        secret_key=keys.secret,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url)
+    )
     task = api.background_listening(dummy_cb)
     await api.close()
     await task
@@ -110,7 +132,15 @@ async def test_websocket_reconnect(connect_disconnect_db):
         assert payload is not None
         cb_called.set()
 
-    api = DsnetApi(URL('http://localhost:23456'), repository, secret_key=keys.secret, message_sender=DirectMessageSender(URL('http://localhost:12345')), reconnect_delay_seconds=0.1)
+    url = URL('http://localhost:23456')
+    api = DsnetApi(
+        url,
+        repository,
+        secret_key=keys.secret,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        reconnect_delay_seconds=0.1
+    )
     api.background_listening(cb)
 
     await local_server.down()
@@ -135,8 +165,21 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     await repository.save_peer(Peer(keys_alice.public))
     await repository.save_peer(Peer(keys_bob.public))
 
-    api_alice = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys_alice.secret, message_sender=DirectMessageSender(URL('http://localhost:12345')))
-    api_bob = DsnetApi(URL('http://localhost:12345'), repository, secret_key=keys_bob.secret, message_sender=DirectMessageSender(URL('http://localhost:12345')))
+    url = URL('http://localhost:12345')
+    api_alice = DsnetApi(
+        url,
+        repository,
+        secret_key=keys_alice.secret,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url)
+    )
+    api_bob = DsnetApi(
+        url,
+        repository,
+        secret_key=keys_bob.secret,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url)
+    )
 
     async def cb_alice(message: Message):
         if message.type() == MessageType.NOTIFICATION:

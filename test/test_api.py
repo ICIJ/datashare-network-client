@@ -14,6 +14,7 @@ from yarl import URL
 
 from dsnetclient.api import DsnetApi, NoTokenException
 from dsnetclient.index import MemoryIndex, Index
+from dsnetclient.message_retriever import ExactMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata
 from dsnetclient.repository import SqlalchemyRepository, Peer
@@ -189,7 +190,14 @@ async def create_api(httpserver, index=None, number_tokens=3):
     await repository.save_peer(Peer(other.public))
     await repository.save_peer(Peer(my_keys.public))
     url = URL(httpserver.url_for('/'))
-    api = DsnetApi(url, repository, message_sender=DirectMessageSender(url), secret_key=my_keys.secret, index=index)
+    api = DsnetApi(
+        url,
+        repository,
+        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        secret_key=my_keys.secret,
+        index=index
+    )
     if number_tokens:
         tokens, server_key = create_tokens(number_tokens)
         await repository.save_tokens(tokens)

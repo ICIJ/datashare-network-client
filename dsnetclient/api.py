@@ -21,6 +21,7 @@ from sscred import (
 from yarl import URL
 
 from dsnetclient.index import Index, MemoryIndex
+from dsnetclient.message_retriever import MessageRetriever
 from dsnetclient.message_sender import MessageSender
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
@@ -31,9 +32,17 @@ class NoTokenException(Exception):
 
 
 class DsnetApi:
-    def __init__(self, url: URL, repository: Repository, secret_key: bytes,
-                 message_sender: MessageSender, reconnect_delay_seconds=2,
-                 index: Index = None, oauth_client: AsyncOAuth2Client = None) -> None:
+    def __init__(
+            self,
+            url: URL,
+            repository: Repository,
+            secret_key: bytes,
+            message_retriever: MessageRetriever,
+            message_sender: MessageSender,
+            reconnect_delay_seconds=2,
+            index: Index = None,
+            oauth_client: AsyncOAuth2Client = None
+        ) -> None:
         self.repository = repository
         self.base_url = url
         self.index = index
@@ -42,6 +51,7 @@ class DsnetApi:
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
+        self.message_retriever = message_retriever
         self.message_sender = message_sender
 
     async def get_server_version(self) -> dict:
@@ -126,16 +136,7 @@ class DsnetApi:
 
     async def handle_ph_notification(self, msg: PigeonHoleNotification) -> None:
         logger.info(f"received ph notification for {msg.adr_hex}")
-        async with ClientSession() as session:
-            for ph in await self.repository.get_pigeonholes_by_adr(msg.adr_hex):
-                async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
-                    http_response.raise_for_status()
-                    message = PigeonHoleMessage.from_bytes(await http_response.read())
-                    message.from_key = ph.key_for_hash
-                    conversation = await self.repository.get_conversation_by_address(ph.address)
-                    logger.debug(f"adding message {message.address.hex()} to conversation {conversation.id}")
-                    conversation.add_message(message)
-                    await self.repository.save_conversation(conversation)
+        await self.message_retriever.retrieve(msg)
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
