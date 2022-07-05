@@ -12,6 +12,7 @@ elasticsearch = '==7.9.1'
 Authlib = "==1.0.0"
 httpx = "*"
 sscred = '==0.2.1'
+msgpack = "*"
 
 [dev-packages]
 pytest-httpserver = "==1.0.4"

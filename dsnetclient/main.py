@@ -17,7 +17,7 @@ from dsnetclient import __version__
 from dsnetclient.api import DsnetApi
 from dsnetclient.async_cmd import AsyncCmd
 from dsnetclient.index import MemoryIndex, Index, LuceneIndex
-from dsnetclient.message_retriever import ExactMatchMessageRetriever
+from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
@@ -33,7 +33,7 @@ class Demo(AsyncCmd):
         self.api = DsnetApi(
             server_url,
             self.repository,
-            message_retriever=ExactMatchMessageRetriever(server_url, self.repository),
+            message_retriever=AddressMatchMessageRetriever(server_url, self.repository),
             message_sender=DirectMessageSender(server_url),
             secret_key=self.private_key,
             index=index,

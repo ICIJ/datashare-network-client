@@ -12,7 +12,7 @@ from sscred.pack import packb, unpackb
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
-from dsnetclient.message_retriever import ExactMatchMessageRetriever
+from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository
@@ -64,7 +64,7 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
     api = DsnetApi(
         url,
         repository,
-        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
         secret_key=b"dummy",
         oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
@@ -84,7 +84,7 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     api = DsnetApi(
         url,
         repository,
-        message_retriever=ExactMatchMessageRetriever(url, repository),
+        message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
         secret_key=b"dummy",
         oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
