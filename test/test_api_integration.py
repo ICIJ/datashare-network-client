@@ -203,5 +203,3 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     await api_alice.close()
     await task_bob
     await task_alice
-
-

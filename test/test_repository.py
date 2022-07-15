@@ -229,6 +229,26 @@ async def test_save_conversation_deletes_old_pigeonholes(connect_disconnect_db):
 
 
 @pytest.mark.asyncio
+async def test_save_conversation_deletes_old_pigeonholes(connect_disconnect_db):
+    now = datetime.now()
+    repository = SqlalchemyRepository(database)
+    query_keys = gen_key_pair()
+    carol_keys = gen_key_pair()
+    carol_side = Conversation.create_from_recipient(carol_keys.secret, query_keys.public)
+    querier_side = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
+    await repository.save_conversation(querier_side)
+
+    ts = await repository.get_last_message_timestamp()
+    assert ts >= now
+
+    querier_side = (await repository.get_conversations())[0]
+    querier_side.add_message(carol_side.create_response(b"Hi"))
+    await repository.save_conversation(querier_side)
+
+    assert ts != await repository.get_last_message_timestamp()
+
+
+@pytest.mark.asyncio
 async def test_save_get_peers(connect_disconnect_db):
     peer_keys = gen_key_pair()
     repository = SqlalchemyRepository(database)

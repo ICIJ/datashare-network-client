@@ -15,6 +15,7 @@ from dsnet.token import AbeToken
 from sqlalchemy import insert, select, column, delete, desc
 from sqlalchemy.sql import Select
 from sscred import packb, unpackb, AbePublicKey
+from sqlalchemy.sql.expression import func
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, token_table
 
@@ -175,10 +176,21 @@ class Repository(metaclass=abc.ABCMeta):
         :return: list of token binary
         """
 
+    @abc.abstractmethod
+    async def get_last_message_timestamp(self) -> datetime.datetime:
+        """
+        :return: the last message timestamp
+        """
+
 
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
+
+    async def get_last_message_timestamp(self) -> Optional[datetime.datetime]:
+        stmt = select(func.max(message_table.c.timestamp)).select_from(message_table)
+        record_or_none = await self.database.fetch_one(stmt)
+        return record_or_none[0] if record_or_none else None
 
     @staticmethod
     def _pigeonhole_from_row(row) -> PigeonHole:
