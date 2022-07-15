@@ -1,8 +1,11 @@
 import asyncio
+import secrets
 from abc import ABC, abstractmethod
 from asyncio import Queue, AbstractEventLoop
 from typing import Awaitable, Callable
 
+from dsnet.core import PH_MESSAGE_LENGTH
+from dsnet.crypto import gen_fake_encrypted_message, gen_fake_address
 from aiohttp import ClientSession
 from yarl import URL
 
@@ -30,7 +33,11 @@ class DirectMessageSender(MessageSender):
 
 
 class QueueMessageSender(MessageSender):
-    """Message sender which sends messages at interfall following a statistical distribution."""
+    """Message sender which sends messages at interfall following a statistical distribution.
+    send_fn: function used to send a message (HTTP POST on the datashare network by default)
+    cover_fn: function used to create a cover message (default PigeonHoleMessage(b"address", b"payload", b"key"))
+    distribution_fn: function that generate a sleep time to wait before sending a message
+    """
 
     def __init__(self, base_url, distribution_fn: Callable[[], float],
                  send_fn: Callable[[PigeonHoleMessage], Awaitable[None]] = None,
@@ -65,7 +72,7 @@ class QueueMessageSender(MessageSender):
                 http_response.raise_for_status()
 
     def _default_cover_fn(self):
-        return PigeonHoleMessage(b"address", b"payload", b"key")
+        return PigeonHoleMessage(gen_fake_address(), gen_fake_encrypted_message(PH_MESSAGE_LENGTH))
 
     async def stop(self):
         self._stop_asked = True

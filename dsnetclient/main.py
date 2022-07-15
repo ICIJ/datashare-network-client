@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 from pathlib import Path
+from random import expovariate, getrandbits
 from typing import List, Set, Optional
 
 import click
@@ -17,14 +18,15 @@ from dsnetclient import __version__
 from dsnetclient.api import DsnetApi
 from dsnetclient.async_cmd import AsyncCmd
 from dsnetclient.index import MemoryIndex, Index, LuceneIndex
-from dsnetclient.message_retriever import AddressMatchMessageRetriever
-from dsnetclient.message_sender import DirectMessageSender
+from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
+from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
 
 class Demo(AsyncCmd):
-    def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index, oauth_client: AsyncOAuth2Client):
+    def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index, oauth_client: AsyncOAuth2Client,
+                 message_retriever=None, message_sender=None):
         super().__init__()
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
@@ -33,8 +35,8 @@ class Demo(AsyncCmd):
         self.api = DsnetApi(
             server_url,
             self.repository,
-            message_retriever=AddressMatchMessageRetriever(server_url, self.repository),
-            message_sender=DirectMessageSender(server_url),
+            message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
+            message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
             secret_key=self.private_key,
             index=index,
             oauth_client=oauth_client
@@ -211,7 +213,8 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--oauth-client-id', prompt='Client ID', help='The client ID to authenticate to the identity server.')
 @click.option('--oauth-client-secret', prompt='Client secret', help='The client secret to authenticate to the identity server.')
 @click.option('--oauth-base-url', prompt='OAuth server base URL', help='The base URL of the identity server.')
-def shell(server_url, private_key, database_url, elasticsearch_url, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url):
+@click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
+def shell(server_url, private_key, database_url, elasticsearch_url, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -226,13 +229,25 @@ def shell(server_url, private_key, database_url, elasticsearch_url, keys, entiti
         my_entities = [e.strip('\n') for e in my_entities]
         index = MemoryIndex(set(my_entities))
 
+    message_sender = None
+    message_retriever = None
+    if cover:
+        message_sender = QueueMessageSender(
+            URL(server_url), lambda: expovariate(0.2)
+        )
+        message_retriever = ProbabilisticCoverMessageRetriever(
+            URL(server_url), SqlalchemyRepository(database_url), lambda: bool(getrandbits(1))
+        )
+
     # id: '3gfTYQImmGF1hbie72AmmAqiRvmlwU-mRl7-N8QHH2I'
     # secret: 'L29aozJYxn_xauWlpGw2SFJ2VcBphuHOhErPF45kYkg'
     oauth_client = AsyncOAuth2Client(
         oauth_client_id,
         oauth_client_secret,
         redirect_uri="http://localhost:8080/auth/callback",
-        base_url=oauth_base_url
+        base_url=oauth_base_url,
+        message_retriever=message_retriever,
+        message_sender=message_sender
     )
 
     asyncio.get_event_loop().run_until_complete(Demo(URL(server_url), private_key_content, database_url, keys_list, index, oauth_client).async_cmdloop())
