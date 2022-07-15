@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from werkzeug import Response
 from yarl import URL
 
-from dsnetclient.api import DsnetApi, NoTokenException
+from dsnetclient.api import DsnetApi, NoTokenException, InvalidAuthorisationResponse
 from dsnetclient.index import MemoryIndex, Index
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender

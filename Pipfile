@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = '==0.13.0'
+datashare-network-core = {editable = true, ref = "bbdb28d3cf6774b6db30ed3d7c0cb9f14681389c", git = "https://github.com/ICIJ/datashare-network-core.git"}
 aiohttp = "==3.8.1"
 click = "==8.0.4"
 aioconsole = "==0.4.1"
@@ -12,12 +12,11 @@ elasticsearch = '==7.9.1'
 Authlib = "==1.0.0"
 httpx = "*"
 sscred = '==0.2.1'
-msgpack = "*"
 
 [dev-packages]
 pytest-httpserver = "==1.0.4"
 alembic = "==1.7.7"
-datashare-network-server = "==0.7.0"
+datashare-network-server = {editable = true, ref = "14339b5da72c86c25089802697ca709f1fe841dd", git = "https://github.com/ICIJ/datashare-network-server.git"}
 uvicorn = {extras = ["standard"], version = "==0.15.0"}
 pytest = "==7.1.0"
 pytest-asyncio = "==0.18.2"

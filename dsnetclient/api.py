@@ -21,8 +21,8 @@ from sscred import (
 from yarl import URL
 
 from dsnetclient.index import Index, MemoryIndex
-from dsnetclient.message_retriever import MessageRetriever
-from dsnetclient.message_sender import MessageSender
+from dsnetclient.message_retriever import MessageRetriever, AddressMatchMessageRetriever
+from dsnetclient.message_sender import MessageSender, DirectMessageSender
 from dsnetclient.models import metadata
 from dsnetclient.repository import Repository, SqlalchemyRepository
 
@@ -202,7 +202,15 @@ def main():
     engine = create_engine(url)
     metadata.create_all(engine)
     repository = SqlalchemyRepository(databases.Database(url))
-    api = DsnetApi(URL('http://localhost:8000'), repository, keys.secret, index=MemoryIndex({"foo", "bar"}))
+    url = URL('http://localhost:8000')
+    api = DsnetApi(
+        url,
+        repository,
+        keys.secret,
+        index=MemoryIndex({"foo", "bar"}),
+        message_retriever=AddressMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+    )
 
     asyncio.get_event_loop().run_until_complete(api.start_listening())
 

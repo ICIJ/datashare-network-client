@@ -118,7 +118,7 @@ class Demo(AsyncCmd):
         """
         phs = await self.api.repository.get_pigeonholes()
         for ph in phs:
-            print(f"{ph.address.hex() if ph.address else ''}: peer {ph.peer_key.hex() if ph.peer_key else '?'} nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
+            print(f"{ph.address.hex() if ph.address else ''}: nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
         return False
 
     async def do_peers(self, _line: str) -> Optional[bool]:
@@ -231,7 +231,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, keys, entiti
     oauth_client = AsyncOAuth2Client(
         oauth_client_id,
         oauth_client_secret,
-        redirect_uri="http://localhost:8080/auth/xemx/callback",
+        redirect_uri="http://localhost:8080/auth/callback",
         base_url=oauth_base_url
     )
 
