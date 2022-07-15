@@ -30,6 +30,9 @@ from dsnetclient.repository import Repository, SqlalchemyRepository
 class NoTokenException(Exception):
     pass
 
+class InvalidAuthorisationResponse(Exception):
+    pass
+
 
 class DsnetApi:
     def __init__(
@@ -150,7 +153,15 @@ class DsnetApi:
     def start_auth(self, authorize_url: str) -> Tuple[str, str]:
         return self.oauth_client.create_authorization_url(authorize_url)
 
+    @staticmethod
+    def _validate_authorization_response(authorization_response: str):
+        """Basic validation for an OAuth2 authorisation response."""
+        url = URL(authorization_response)
+        if "code" not in url.query:
+            raise InvalidAuthorisationResponse()
+
     async def end_auth(self, token_endpoint: str, authorization_response: str):
+        self._validate_authorization_response(authorization_response)
         return await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
 
     async def show_tokens(self) -> List[bytes]:

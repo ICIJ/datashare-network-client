@@ -11,7 +11,7 @@ from sscred.blind_signature import AbeParam, AbePublicKey
 from sscred.pack import packb, unpackb
 from yarl import URL
 
-from dsnetclient.api import DsnetApi
+from dsnetclient.api import DsnetApi, InvalidAuthorisationResponse
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
@@ -106,6 +106,24 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is None
+
+
+@pytest.mark.asyncio
+async def test_invalid_authorisation_response_fails(pkey, startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    url = URL('http://notused')
+    api = DsnetApi(
+        url,
+        repository,
+        message_retriever=AddressMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        secret_key=b"dummy",
+        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
+    )
+    url, _ = api.start_auth('http://localhost:12345/authorize')
+    invalid_url = "http://localhost:3001/oauth/authorize?response_type=code&client_id=datashareuidforseed&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fxemx%2Fcallback&state=2m2tt1578rCheN9iWJNlVK2ptbJS8u"
+    with pytest.raises(InvalidAuthorisationResponse):
+        await api.end_auth("http://localhost:12345/token", invalid_url)
 
 
 async def authenticate(authorize_url, username, password) -> str:
