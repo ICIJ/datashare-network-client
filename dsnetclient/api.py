@@ -138,7 +138,7 @@ class DsnetApi:
             logger.warning(f"received unhandled type {message.type()}")
 
     async def handle_ph_notification(self, msg: PigeonHoleNotification) -> None:
-        logger.info(f"received ph notification for {msg.adr_hex}")
+        logger.debug(f"received ph notification for {msg.adr_hex}")
         await self.message_retriever.retrieve(msg)
 
     async def handle_query(self, msg: Query) -> None:
