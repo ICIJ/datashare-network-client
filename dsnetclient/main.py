@@ -209,12 +209,13 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--database-url', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
 @click.option('--keys', prompt='Others\' key', help='Path to file containing keys (one key per line)')
 @click.option('--elasticsearch-url', cls=MutuallyExclusiveOption, help='Elasticsearch url ex: http://elasticsearch:9200',  mutually_exclusive=["entities_file"])
+@click.option('--elasticsearch-index', help='Elasticsearch index ex: local-datashare', default='local-datashare')
 @click.option('--entities-file', cls=MutuallyExclusiveOption, help='Entities files (one per line)',  mutually_exclusive=["elasticsearch_url"])
 @click.option('--oauth-client-id', prompt='Client ID', help='The client ID to authenticate to the identity server.')
 @click.option('--oauth-client-secret', prompt='Client secret', help='The client secret to authenticate to the identity server.')
 @click.option('--oauth-base-url', prompt='OAuth server base URL', help='The base URL of the identity server.')
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
-def shell(server_url, private_key, database_url, elasticsearch_url, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover):
+def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearch_index, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -222,7 +223,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, keys, entiti
         keys_list = f.readlines()
 
     if elasticsearch_url is not None:
-        index = LuceneIndex(AsyncElasticsearch(elasticsearch_url))
+        index = LuceneIndex(AsyncElasticsearch(elasticsearch_url), elasticsearch_index)
     else:
         with open(entities_file, "r") as f:
             my_entities = f.readlines()
