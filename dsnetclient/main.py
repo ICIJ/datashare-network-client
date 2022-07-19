@@ -7,6 +7,11 @@ from pathlib import Path
 from random import expovariate, getrandbits
 from typing import List, Set, Optional
 
+try:
+    import readline
+except ImportError:
+    readline = None
+
 import click
 import databases
 import dsnet
@@ -34,7 +39,7 @@ def asynccmd(f):
 
 class Demo(Cmd):
     def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index, oauth_client: AsyncOAuth2Client,
-                 message_retriever=None, message_sender=None):
+                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000):
         super().__init__()
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
@@ -56,6 +61,21 @@ class Demo(Cmd):
             key = bytes.fromhex(key_hex)
             if private_key != self.public_key:
                 asyncio.get_event_loop().run_until_complete(self.repository.save_peer(Peer(key)))
+
+        if history_file is None:
+            history_file = Path.home() / ".dsnet_history"
+
+        self.history_file = history_file.resolve()
+        self.histfile_size = history_file_size
+
+    def preloop(self):
+        if readline and self.history_file.is_file():
+            readline.read_history_file(self.history_file)
+
+    def postloop(self):
+        if readline:
+            readline.set_history_length(self.histfile_size)
+            readline.write_history_file(self.history_file)
 
     @asynccmd
     async def do_version(self, _line) -> Optional[bool]:
@@ -236,7 +256,9 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--oauth-client-secret', prompt='Client secret', help='The client secret to authenticate to the identity server.')
 @click.option('--oauth-base-url', prompt='OAuth server base URL', help='The base URL of the identity server.')
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
-def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearch_index, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover):
+@click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
+@click.option('--history-size', help="Client's history size", required=False, default=1000)
+def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearch_index, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover, history_file, history_size):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -272,7 +294,16 @@ def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearc
         message_sender=message_sender
     )
 
-    Demo(URL(server_url), private_key_content, database_url, keys_list, index, oauth_client).cmdloop()
+    Demo(
+        URL(server_url),
+        private_key_content,
+        database_url,
+        keys_list,
+        index,
+        oauth_client,
+        history_file=history_file,
+        history_file_size=history_size
+    ).cmdloop()
 
 
 if __name__ == '__main__':
