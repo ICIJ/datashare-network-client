@@ -1,6 +1,8 @@
 import asyncio
 import base64
 import logging
+from cmd import Cmd
+from functools import wraps
 from pathlib import Path
 from random import expovariate, getrandbits
 from typing import List, Set, Optional
@@ -16,7 +18,6 @@ from yarl import URL
 
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi
-from dsnetclient.async_cmd import AsyncCmd
 from dsnetclient.index import MemoryIndex, Index, LuceneIndex
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
@@ -24,7 +25,14 @@ from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
 
-class Demo(AsyncCmd):
+def asynccmd(f):
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        return asyncio.get_event_loop().run_until_complete(f(*args, **kwds))
+    return wrapper
+
+
+class Demo(Cmd):
     def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index, oauth_client: AsyncOAuth2Client,
                  message_retriever=None, message_sender=None):
         super().__init__()
@@ -49,6 +57,7 @@ class Demo(AsyncCmd):
             if private_key != self.public_key:
                 asyncio.get_event_loop().run_until_complete(self.repository.save_peer(Peer(key)))
 
+    @asynccmd
     async def do_version(self, _line) -> Optional[bool]:
         """
         display client/server version of datashare network
@@ -57,6 +66,7 @@ class Demo(AsyncCmd):
         print(f"client {__version__} (core {dsnet.__version__}) with {server_version['message']} (core {server_version['core_version']})")
         return False
 
+    @asynccmd
     async def do_query(self, line: str) -> Optional[bool]:
         """
         send a query to datashare network
@@ -66,6 +76,7 @@ class Demo(AsyncCmd):
         await self.api.send_query(line.encode())
         return False
 
+    @asynccmd
     async def do_start_auth(self, line: str) -> Optional[bool]:
         """
         create OAuth2 authentication url and prints it to the console.
@@ -75,6 +86,7 @@ class Demo(AsyncCmd):
               f"Then call end_auth command with the resulting url")
         return False
 
+    @asynccmd
     async def do_end_auth(self, line: str) -> Optional[bool]:
         """
         Finish authentication with your identity provider.
@@ -86,6 +98,7 @@ class Demo(AsyncCmd):
             print("Authentication failure! Please restart authentication process.")
         return False
 
+    @asynccmd
     async def do_get_tokens(self, _line: str):
         """
         get pretokens from token server and compute Abe blind tokens. They are stored in the local repository.
@@ -94,6 +107,7 @@ class Demo(AsyncCmd):
         print(f"retrieved {nb_tokens} token{'s' if nb_tokens > 1 else ''}")
         return False
 
+    @asynccmd
     async def do_tokens(self, _line: str):
         """
         show tokens from the local repository.
@@ -103,6 +117,7 @@ class Demo(AsyncCmd):
             print(f"{i+1:02}: [32:64] {token.hex()[32:64]} {len(token)}")
         return False
 
+    @asynccmd
     async def do_queries(self, _line: str) -> Optional[bool]:
         """
         list the queries sent or received (i.e. conversations)
@@ -114,6 +129,7 @@ class Demo(AsyncCmd):
                   f"(sent: {conversation.nb_sent_messages}/recv: {conversation.nb_recv_messages})")
         return False
 
+    @asynccmd
     async def do_phs(self, _line: str) -> Optional[bool]:
         """
         list the waiting pigeon holes
@@ -123,6 +139,7 @@ class Demo(AsyncCmd):
             print(f"{ph.address.hex() if ph.address else ''}: nb msg ({ph.message_number}) (conversation id={ph.conversation_id})")
         return False
 
+    @asynccmd
     async def do_peers(self, _line: str) -> Optional[bool]:
         """
         list the peers keys
@@ -132,6 +149,7 @@ class Demo(AsyncCmd):
             print(f"{peer.id}: {peer.public_key.hex()} {'(me)' if self.public_key == peer.public_key else ''}")
         return False
 
+    @asynccmd
     async def do_messages(self, line: str) -> Optional[bool]:
         """
         list the messages related to a conversation
@@ -146,6 +164,7 @@ class Demo(AsyncCmd):
             print('no such conversation id')
         return False
 
+    @asynccmd
     async def do_message(self, line: str) -> Optional[bool]:
         """
         send a message to a conversation identified with its id
@@ -156,6 +175,7 @@ class Demo(AsyncCmd):
         await self.api.send_message(int(conv_id), message.encode())
         return False
 
+    @asynccmd
     async def do_pk(self, _) -> Optional[bool]:
         """
         displays the user public key
@@ -163,6 +183,7 @@ class Demo(AsyncCmd):
         print(self.public_key.hex())
         return False
 
+    @asynccmd
     async def do_EOF(self, line):
         """
         type CTRL+D or CTRL+C to exit
@@ -251,7 +272,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearc
         message_sender=message_sender
     )
 
-    asyncio.get_event_loop().run_until_complete(Demo(URL(server_url), private_key_content, database_url, keys_list, index, oauth_client).async_cmdloop())
+    Demo(URL(server_url), private_key_content, database_url, keys_list, index, oauth_client).cmdloop()
 
 
 if __name__ == '__main__':
