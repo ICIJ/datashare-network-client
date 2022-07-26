@@ -289,9 +289,7 @@ def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearc
         oauth_client_id,
         oauth_client_secret,
         redirect_uri="http://localhost:8080/auth/callback",
-        base_url=oauth_base_url,
-        message_retriever=message_retriever,
-        message_sender=message_sender
+        base_url=oauth_base_url
     )
 
     Demo(
@@ -302,7 +300,9 @@ def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearc
         index,
         oauth_client,
         history_file=history_file,
-        history_file_size=history_size
+        history_file_size=history_size,
+        message_retriever=message_retriever,
+        message_sender=message_sender
     ).cmdloop()
 
 
