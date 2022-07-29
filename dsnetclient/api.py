@@ -1,6 +1,6 @@
 import asyncio
 from asyncio import Task
-from typing import Awaitable, Callable, Tuple, List
+from typing import Awaitable, Callable, Tuple, List, Optional
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
@@ -30,7 +30,7 @@ from dsnetclient.repository import Repository, SqlalchemyRepository
 class NoTokenException(Exception):
     pass
 
-class InvalidAuthorisationResponse(Exception):
+class InvalidAuthorizationResponse(Exception):
     pass
 
 
@@ -38,24 +38,28 @@ class DsnetApi:
     def __init__(
             self,
             url: URL,
+            token_url: URL,
             repository: Repository,
             secret_key: bytes,
             message_retriever: MessageRetriever,
             message_sender: MessageSender,
             reconnect_delay_seconds=2,
             index: Index = None,
-            oauth_client: AsyncOAuth2Client = None
+            oauth2_username_field: str = "username",
+            oauth2_password_field: str = "password",
         ) -> None:
+        self.token_url = token_url
         self.repository = repository
         self.base_url = url
         self.index = index
-        self.oauth_client = oauth_client
         self.secret_key = secret_key
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.stop = False
         self.ws = None
         self.message_retriever = message_retriever
         self.message_sender = message_sender
+        self.oauth2_username_field = oauth2_username_field
+        self.oauth2_password_field = oauth2_password_field
 
     async def get_server_version(self) -> dict:
         async with ClientSession() as session:
@@ -152,66 +156,74 @@ class DsnetApi:
         else:
             logger.warning(f"invalid query's signature {msg.public_key.hex()}")
 
-    def start_auth(self, authorize_url: str) -> Tuple[str, str]:
-        return self.oauth_client.create_authorization_url(authorize_url)
-
-    @staticmethod
-    def _validate_authorization_response(authorization_response: str):
-        """Basic validation for an OAuth2 authorisation response."""
-        url = URL(authorization_response)
-        if "code" not in url.query:
-            raise InvalidAuthorisationResponse()
-
-    async def end_auth(self, token_endpoint: str, authorization_response: str):
-        self._validate_authorization_response(authorization_response)
-        return await self.oauth_client.fetch_token(token_endpoint, authorization_response=authorization_response)
-
     async def show_tokens(self) -> List[bytes]:
         return [packb(abe_token.token) for abe_token in await self.repository.get_tokens()]
 
-    async def fetch_pre_tokens(self) -> int:
-        publickey_resp = await self.oauth_client.get('/api/v2/dstokens/publickey')
-        server_public_key_raw = publickey_resp.content
-        local_key = await self.repository.get_token_server_key()
+    async def fetch_pre_tokens(self, username: str, password: str, form_parser: Callable[[bytes, str, str], Tuple[str, dict]]) -> int:
+        async with ClientSession() as session:
+            publickey_resp = await session.get(self.token_url.join(URL('publickey')))
+            server_public_key_raw = await publickey_resp.content.read()
+            local_key = await self.repository.get_token_server_key()
 
-        server_key: AbePublicKey = unpackb(server_public_key_raw)
-        if server_key != local_key:
-            commitments_resp = await self.oauth_client.post('/api/v2/dstokens/commitments')
-            commitments: List[SignerCommitMessage] = unpackb(commitments_resp.content)
+            server_key: AbePublicKey = unpackb(server_public_key_raw)
+            if server_key != local_key:
+                commitments_resp = await session.post(self.token_url.join(URL('commitments')))
 
-            challenges, challenges_internal, token_secret_keys = generate_challenges(server_key, commitments)
+                content_type = commitments_resp.headers.get("Content-Type")
+                if content_type != "application/x-msgpack":
+                    if "text/html" not in content_type or username is None or password is None:
+                        raise InvalidAuthorizationResponse()
+                    html_content = await commitments_resp.content.read()
+                    url, parameters = form_parser(html_content, username, password)
+                    if url is None:
+                        url = commitments_resp.url
+                    oauth2_resp = await session.post(url, data=parameters)
 
-            pretoken_resp = await self.oauth_client.post(
-                '/api/v2/dstokens/pretokens',
-                headers={'Content-Type': 'application/x-msgpack'},
-                content=packb(challenges)
-            )
-            pretokens: List[SignerResponseMessage] = unpackb(pretoken_resp.content)
-            tokens = generate_tokens(server_key, challenges_internal, token_secret_keys, pretokens)
+                    if oauth2_resp.status != 200:
+                        raise InvalidAuthorizationResponse()
 
-            # bulk insert tokens in DB
-            await self.repository.save_token_server_key(server_key)
-            await self.repository.save_tokens(tokens)
+                    commitments_resp = await session.post(self.token_url.join(URL('commitments')))
 
-            return len(tokens)
+                    if commitments_resp.headers.get("Content-Type") != 'application/x-msgpack':
+                        raise InvalidAuthorizationResponse()
+
+                commitments: List[SignerCommitMessage] = unpackb(await commitments_resp.content.read())
+
+                challenges, challenges_internal, token_secret_keys = generate_challenges(server_key, commitments)
+
+                pretoken_resp = await session.post(
+                    self.token_url.join(URL('pretokens')),
+                    headers={'Content-Type': 'application/x-msgpack'},
+                    data=packb(challenges)
+                )
+                pretokens: List[SignerResponseMessage] = unpackb(await pretoken_resp.content.read())
+                tokens = generate_tokens(server_key, challenges_internal, token_secret_keys, pretokens)
+
+                # bulk insert tokens in DB
+                await self.repository.save_token_server_key(server_key)
+                await self.repository.save_tokens(tokens)
+
+                return len(tokens)
         return 0
 
 
 def main():
     # for testing
     keys = gen_key_pair()
-    url = 'sqlite:///dsnet.db'
-    engine = create_engine(url)
+    dburl = 'sqlite:///dsnet.db'
+    engine = create_engine(dburl)
     metadata.create_all(engine)
-    repository = SqlalchemyRepository(databases.Database(url))
+    repository = SqlalchemyRepository(databases.Database(dburl))
     url = URL('http://localhost:8000')
+    token_url = URL('http://localhost:8001')
     api = DsnetApi(
         url,
+        token_url,
         repository,
         keys.secret,
         index=MemoryIndex({"foo", "bar"}),
-        message_retriever=AddressMatchMessageRetriever(url, repository),
-        message_sender=DirectMessageSender(url),
+        message_retriever=AddressMatchMessageRetriever(URL(dburl), repository),
+        message_sender=DirectMessageSender(URL(dburl)),
     )
 
     asyncio.get_event_loop().run_until_complete(api.start_listening())

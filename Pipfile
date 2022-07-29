@@ -12,11 +12,13 @@ elasticsearch = '==7.9.1'
 Authlib = "==1.0.0"
 httpx = "*"
 sscred = '==0.2.1'
+beautifulsoup4 = '*'
 
 [dev-packages]
 pytest-httpserver = "==1.0.4"
 alembic = "==1.7.7"
 datashare-network-server = {editable = true, ref = "14339b5da72c86c25089802697ca709f1fe841dd", git = "https://github.com/ICIJ/datashare-network-server.git"}
+datashare-network-tokenserver = {editable = true, ref = "2ce25e70ffebdb13db0d44abc2ecb56246b3e16f", git = "https://github.com/ICIJ/datashare-network-tokenserver.git"}
 uvicorn = {extras = ["standard"], version = "==0.15.0"}
 pytest = "==7.1.0"
 pytest-asyncio = "==0.18.2"
@@ -24,10 +26,8 @@ async-solipsism = "*"
 pytest-timeout = "==2.1.0"
 bumpversion = "==0.6.0"
 setuptools-pipfile = "==0.4.1"
+python-multipart = "*"
 twine = "==3.2.0"
-fastapi = {extras = ["all"], version = "==0.75.0"}
-fastapi-sessions = "==0.3.2"
-datashare-network-tokenserver= "==0.1.2"
 
 [requires]
 python_version = "3"

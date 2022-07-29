@@ -51,6 +51,7 @@ async def test_root(startup_and_shutdown_server):
     assert await DsnetApi(
             url,
             None,
+            None,
             secret_key=b"dummy",
             message_retriever=AddressMatchMessageRetriever(url, None),
             message_sender=DirectMessageSender(url)
@@ -81,6 +82,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     url = URL('http://localhost:12345')
     api = DsnetApi(
         url,
+        None,
         repository,
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
@@ -102,6 +104,7 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
     url = URL('http://localhost:12345')
     api = DsnetApi(
         url,
+        None,
         repository,
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
@@ -135,6 +138,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
     url = URL('http://localhost:23456')
     api = DsnetApi(
         url,
+        None,
         repository,
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
@@ -171,6 +175,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
 
     api_alice = DsnetApi(
         url,
+        None,
         repository,
         secret_key=keys_alice.secret,
         message_retriever=retriever,
@@ -178,6 +183,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     )
     api_bob = DsnetApi(
         url,
+        None,
         repository,
         secret_key=keys_bob.secret,
         message_retriever=retriever,

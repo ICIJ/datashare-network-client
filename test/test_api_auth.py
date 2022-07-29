@@ -1,17 +1,16 @@
 import os
 
 import databases
-import httpx
 import pytest
 import pytest_asyncio
-from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dsnet.token import AbeToken
 from sqlalchemy import create_engine
 from sscred.blind_signature import AbeParam, AbePublicKey
-from sscred.pack import packb, unpackb
+from sscred.pack import packb
 from yarl import URL
 
-from dsnetclient.api import DsnetApi, InvalidAuthorisationResponse
+from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
+from dsnetclient.form_parser import bs_parser
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
@@ -21,7 +20,7 @@ from test.server import UvicornTestServer
 DATABASE_URL = 'sqlite:///auth_test.db'
 database = databases.Database(DATABASE_URL)
 pkey = None
-TOKEN_SERVER_PORT = 12346
+TOKEN_SERVER_PORT = 12345
 os.environ['TOKEN_SERVER_PORT'] = str(TOKEN_SERVER_PORT)
 os.environ['TOKEN_SERVER_NBTOKENS'] = str(3)
 
@@ -47,7 +46,7 @@ async def connect_disconnect_db():
 
 @pytest_asyncio.fixture
 async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
-    id_server = UvicornTestServer('test.server_oauth2:app', port=12345)
+    id_server = UvicornTestServer('test.server_oauth2:app', port=12346)
     token_server = UvicornTestServer('tokenserver.main:app', port=TOKEN_SERVER_PORT)
     await id_server.up()
     await token_server.up()
@@ -57,24 +56,49 @@ async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
 
 
 @pytest.mark.asyncio
-async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers):
+async def test_fetch_token_not_authenticated(startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    api = DsnetApi(
+        URL('http://notused'),
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
+        repository,
+        message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
+        message_sender=DirectMessageSender(URL('http://notused')),
+        secret_key=b"dummy",
+    )
+    with pytest.raises(InvalidAuthorizationResponse):
+        await api.fetch_pre_tokens(None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_with_authentication_bad_login(startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    api = DsnetApi(
+        URL('http://notused'),
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
+        repository,
+        message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
+        message_sender=DirectMessageSender(URL('http://notused')),
+        secret_key=b"dummy",
+    )
+    with pytest.raises(InvalidAuthorizationResponse):
+        await api.fetch_pre_tokens('user', 'bad_password', bs_parser)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip
+async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers, pkey):
     repository = SqlalchemyRepository(database)
     await repository.save_token_server_key(pkey)
-    url = URL('http://notused')
     api = DsnetApi(
-        url,
+        URL('http://notused'),
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
         repository,
-        message_retriever=AddressMatchMessageRetriever(url, repository),
-        message_sender=DirectMessageSender(url),
+        message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
+        message_sender=DirectMessageSender(URL('http://notused')),
         secret_key=b"dummy",
-        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
     )
-    url, _ = api.start_auth('http://localhost:12345/authorize')
-    assert url is not None    # will be displayed to user for use in browser
-    returned_url = await authenticate(url, 'johndoe', 'secret')  # will be pasted by the user in ds client CLI
-    await api.end_auth("http://localhost:12345/token", returned_url)
-
-    assert 0 == (await api.fetch_pre_tokens())
+    assert 0 == await api.fetch_pre_tokens('johndoe', 'secret', bs_parser)
 
 
 @pytest.mark.asyncio
@@ -83,17 +107,13 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     url = URL('http://notused')
     api = DsnetApi(
         url,
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        secret_key=b"dummy",
-        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
+        secret_key=b"dummy"
     )
-    url, _ = api.start_auth('http://localhost:12345/authorize')
-    returned_url = await authenticate(url, 'johndoe', 'secret')  # will be pasted by the user in ds client CLI
-    await api.end_auth("http://localhost:12345/token", returned_url)
-
-    assert 3 == await api.fetch_pre_tokens()
+    assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', bs_parser)
 
     server_key: AbePublicKey = await repository.get_token_server_key()
     assert server_key is not None
@@ -106,31 +126,3 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is None
-
-
-@pytest.mark.asyncio
-async def test_invalid_authorisation_response_fails(pkey, startup_and_shutdown_servers):
-    repository = SqlalchemyRepository(database)
-    url = URL('http://notused')
-    api = DsnetApi(
-        url,
-        repository,
-        message_retriever=AddressMatchMessageRetriever(url, repository),
-        message_sender=DirectMessageSender(url),
-        secret_key=b"dummy",
-        oauth_client=AsyncOAuth2Client('foo', 'bar', redirect_uri="http://localhost:12345/callback", base_url=f"http://localhost:12345")
-    )
-    url, _ = api.start_auth('http://localhost:12345/authorize')
-    invalid_url = "http://localhost:3001/oauth/authorize?response_type=code&client_id=datashareuidforseed&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fxemx%2Fcallback&state=2m2tt1578rCheN9iWJNlVK2ptbJS8u"
-    with pytest.raises(InvalidAuthorisationResponse):
-        await api.end_auth("http://localhost:12345/token", invalid_url)
-
-
-async def authenticate(authorize_url, username, password) -> str:
-    async with httpx.AsyncClient() as client:
-        await client.get(authorize_url)
-        response = await client.post("http://localhost:12345/signin", data={
-            'username': username,
-            "password": password
-        })
-        return response.headers['location']

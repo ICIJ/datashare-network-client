@@ -3,9 +3,12 @@ import base64
 import logging
 from cmd import Cmd
 from functools import wraps
+from getpass import getpass, getuser
 from pathlib import Path
 from random import expovariate, getrandbits
 from typing import List, Set, Optional
+
+from dsnetclient.form_parser import bs_parser
 
 try:
     import readline
@@ -38,8 +41,9 @@ def asynccmd(f):
 
 
 class Demo(Cmd):
-    def __init__(self, server_url: URL, private_key: str, database_url, keys: List[str], index: Index, oauth_client: AsyncOAuth2Client,
-                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000):
+    def __init__(self, server_url: URL, token_url: URL, private_key: str, database_url, keys: List[str], index: Index,
+                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000,
+                 oauth2_username_field='username', oauth2_password_field='password'):
         super().__init__()
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
@@ -47,12 +51,14 @@ class Demo(Cmd):
         self.repository = SqlalchemyRepository(self.database)
         self.api = DsnetApi(
             server_url,
+            token_url,
             self.repository,
             message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
             message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
             secret_key=self.private_key,
             index=index,
-            oauth_client=oauth_client
+            oauth2_username_field=oauth2_username_field,
+            oauth2_password_field=oauth2_password_field
         )
         self._listener = self.api.background_listening()
         add_stdout_handler(level=logging.DEBUG)
@@ -97,33 +103,13 @@ class Demo(Cmd):
         return False
 
     @asynccmd
-    async def do_start_auth(self, line: str) -> Optional[bool]:
-        """
-        create OAuth2 authentication url and prints it to the console.
-        """
-        url, state = self.api.start_auth(str(self.api.oauth_client.base_url.join('/oauth/authorize')))
-        print(f"copy this url ({url}) in your browser and authenticate. "
-              f"Then call end_auth command with the resulting url")
-        return False
-
-    @asynccmd
-    async def do_end_auth(self, line: str) -> Optional[bool]:
-        """
-        Finish authentication with your identity provider.
-        """
-        success = await self.api.end_auth("/oauth/token", line)
-        if success:
-            print("You successfully authenticated, you can now order tokens with 'tokens'")
-        else:
-            print("Authentication failure! Please restart authentication process.")
-        return False
-
-    @asynccmd
     async def do_get_tokens(self, _line: str):
         """
         get pretokens from token server and compute Abe blind tokens. They are stored in the local repository.
         """
-        nb_tokens = await self.api.fetch_pre_tokens()
+        username = input("Username: ")
+        password = getpass()
+        nb_tokens = await self.api.fetch_pre_tokens(username, password, bs_parser)
         print(f"retrieved {nb_tokens} token{'s' if nb_tokens > 1 else ''}")
         return False
 
@@ -245,20 +231,21 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 
 
 @cli.command()
+@click.option('--username-field', prompt='Username field name', help='Form field name for the username for oauth', default='username')
+@click.option('--password-field', prompt='Password field name', help='Form field name for the password for oauth', default='password')
 @click.option('--server-url', prompt='Server url', help='The http url where the server can be joined')
+@click.option('--token-server-url', prompt='Token server url', help='The http url where the token server can be joined')
 @click.option('--private-key', prompt='User private key', help='Private key file (prefix with @)')
 @click.option('--database-url', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
 @click.option('--keys', prompt='Others\' key', help='Path to file containing keys (one key per line)')
 @click.option('--elasticsearch-url', cls=MutuallyExclusiveOption, help='Elasticsearch url ex: http://elasticsearch:9200',  mutually_exclusive=["entities_file"])
 @click.option('--elasticsearch-index', help='Elasticsearch index ex: local-datashare', default='local-datashare')
 @click.option('--entities-file', cls=MutuallyExclusiveOption, help='Entities files (one per line)',  mutually_exclusive=["elasticsearch_url"])
-@click.option('--oauth-client-id', prompt='Client ID', help='The client ID to authenticate to the identity server.')
-@click.option('--oauth-client-secret', prompt='Client secret', help='The client secret to authenticate to the identity server.')
-@click.option('--oauth-base-url', prompt='OAuth server base URL', help='The base URL of the identity server.')
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
 @click.option('--history-size', help="Client's history size", required=False, default=1000)
-def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearch_index, keys, entities_file, oauth_client_id, oauth_client_secret, oauth_base_url, cover, history_file, history_size):
+def shell(oauth2_username_field, oauth2_password_field, server_url, token_url, private_key, database_url,
+          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -283,26 +270,19 @@ def shell(server_url, private_key, database_url, elasticsearch_url, elasticsearc
             URL(server_url), SqlalchemyRepository(database_url), lambda: bool(getrandbits(1))
         )
 
-    # id: '3gfTYQImmGF1hbie72AmmAqiRvmlwU-mRl7-N8QHH2I'
-    # secret: 'L29aozJYxn_xauWlpGw2SFJ2VcBphuHOhErPF45kYkg'
-    oauth_client = AsyncOAuth2Client(
-        oauth_client_id,
-        oauth_client_secret,
-        redirect_uri="http://localhost:8080/auth/callback",
-        base_url=oauth_base_url
-    )
-
     Demo(
         URL(server_url),
+        URL(token_url),
         private_key_content,
         database_url,
         keys_list,
         index,
-        oauth_client,
         history_file=history_file,
         history_file_size=history_size,
         message_retriever=message_retriever,
-        message_sender=message_sender
+        message_sender=message_sender,
+        oauth2_username_field=oauth2_username_field,
+        oauth2_password_field=oauth2_password_field
     ).cmdloop()
 
 

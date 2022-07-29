@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from werkzeug import Response
 from yarl import URL
 
-from dsnetclient.api import DsnetApi, NoTokenException, InvalidAuthorisationResponse
+from dsnetclient.api import DsnetApi, NoTokenException, InvalidAuthorizationResponse
 from dsnetclient.index import MemoryIndex, Index
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
@@ -192,6 +192,7 @@ async def create_api(httpserver, index=None, number_tokens=3):
     url = URL(httpserver.url_for('/'))
     api = DsnetApi(
         url,
+        None,
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
