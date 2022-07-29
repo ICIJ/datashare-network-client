@@ -1,14 +1,13 @@
 import asyncio
 from asyncio import Task
-from typing import Awaitable, Callable, Tuple, List, Optional
+from typing import Awaitable, Callable, Tuple, List
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
-from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dsnet.core import Conversation, Query
-from dsnet.crypto import gen_key_pair, get_public_key
+from dsnet.crypto import gen_key_pair
 from dsnet.logger import logger
-from dsnet.message import Message, MessageType, PigeonHoleNotification, PigeonHoleMessage
+from dsnet.message import Message, MessageType, PigeonHoleNotification
 from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
 from sscred import (
@@ -45,8 +44,6 @@ class DsnetApi:
             message_sender: MessageSender,
             reconnect_delay_seconds=2,
             index: Index = None,
-            oauth2_username_field: str = "username",
-            oauth2_password_field: str = "password",
         ) -> None:
         self.token_url = token_url
         self.repository = repository
@@ -58,8 +55,6 @@ class DsnetApi:
         self.ws = None
         self.message_retriever = message_retriever
         self.message_sender = message_sender
-        self.oauth2_username_field = oauth2_username_field
-        self.oauth2_password_field = oauth2_password_field
 
     async def get_server_version(self) -> dict:
         async with ClientSession() as session:

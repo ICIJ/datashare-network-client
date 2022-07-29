@@ -1,12 +1,11 @@
 import asyncio
-import base64
 import logging
 from cmd import Cmd
 from functools import wraps
-from getpass import getpass, getuser
+from getpass import getpass
 from pathlib import Path
 from random import expovariate, getrandbits
-from typing import List, Set, Optional
+from typing import List, Optional
 
 from dsnetclient.form_parser import bs_parser
 
@@ -18,14 +17,13 @@ except ImportError:
 import click
 import databases
 import dsnet
-from authlib.integrations.httpx_client import AsyncOAuth2Client
 from dsnet.crypto import get_public_key, gen_key_pair
 from dsnet.logger import add_stdout_handler
 from elasticsearch import AsyncElasticsearch
 from yarl import URL
 
 from dsnetclient import __version__
-from dsnetclient.api import DsnetApi
+from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
 from dsnetclient.index import MemoryIndex, Index, LuceneIndex
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
@@ -42,8 +40,7 @@ def asynccmd(f):
 
 class Demo(Cmd):
     def __init__(self, server_url: URL, token_url: URL, private_key: str, database_url, keys: List[str], index: Index,
-                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000,
-                 oauth2_username_field='username', oauth2_password_field='password'):
+                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000):
         super().__init__()
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
@@ -56,9 +53,7 @@ class Demo(Cmd):
             message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
             message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
             secret_key=self.private_key,
-            index=index,
-            oauth2_username_field=oauth2_username_field,
-            oauth2_password_field=oauth2_password_field
+            index=index
         )
         self._listener = self.api.background_listening()
         add_stdout_handler(level=logging.DEBUG)
@@ -109,8 +104,11 @@ class Demo(Cmd):
         """
         username = input("Username: ")
         password = getpass()
-        nb_tokens = await self.api.fetch_pre_tokens(username, password, bs_parser)
-        print(f"retrieved {nb_tokens} token{'s' if nb_tokens > 1 else ''}")
+        try:
+            nb_tokens = await self.api.fetch_pre_tokens(username, password, bs_parser)
+            print(f"retrieved {nb_tokens} token{'s' if nb_tokens > 1 else ''}")
+        except InvalidAuthorizationResponse:
+            print("Invalid username or password!")
         return False
 
     @asynccmd
@@ -231,8 +229,6 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 
 
 @cli.command()
-@click.option('--username-field', prompt='Username field name', help='Form field name for the username for oauth', default='username')
-@click.option('--password-field', prompt='Password field name', help='Form field name for the password for oauth', default='password')
 @click.option('--server-url', prompt='Server url', help='The http url where the server can be joined')
 @click.option('--token-server-url', prompt='Token server url', help='The http url where the token server can be joined')
 @click.option('--private-key', prompt='User private key', help='Private key file (prefix with @)')
@@ -244,7 +240,7 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
 @click.option('--history-size', help="Client's history size", required=False, default=1000)
-def shell(oauth2_username_field, oauth2_password_field, server_url, token_url, private_key, database_url,
+def shell(server_url, token_server_url, private_key, database_url,
           elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size):
     with open(private_key, "r") as f:
         private_key_content = f.read()
@@ -272,7 +268,7 @@ def shell(oauth2_username_field, oauth2_password_field, server_url, token_url, p
 
     Demo(
         URL(server_url),
-        URL(token_url),
+        URL(token_server_url),
         private_key_content,
         database_url,
         keys_list,
@@ -280,9 +276,7 @@ def shell(oauth2_username_field, oauth2_password_field, server_url, token_url, p
         history_file=history_file,
         history_file_size=history_size,
         message_retriever=message_retriever,
-        message_sender=message_sender,
-        oauth2_username_field=oauth2_username_field,
-        oauth2_password_field=oauth2_password_field
+        message_sender=message_sender
     ).cmdloop()
 
 

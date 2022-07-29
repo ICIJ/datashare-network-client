@@ -1,6 +1,6 @@
 import abc
 from json import dumps
-from typing import Set, List
+from typing import Set
 
 from elasticsearch import AsyncElasticsearch
 
