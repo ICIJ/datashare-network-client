@@ -3,7 +3,7 @@ from asyncio import Task
 from typing import Awaitable, Callable, Tuple, List
 
 import databases
-from aiohttp import ClientSession, WSMsgType, ClientConnectorError
+from aiohttp import ClientSession, WSMsgType, ClientConnectorError, InvalidURL
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair
 from dsnet.logger import logger
@@ -169,9 +169,12 @@ class DsnetApi:
                     if "text/html" not in content_type or username is None or password is None:
                         raise InvalidAuthorizationResponse()
                     html_content = await commitments_resp.content.read()
-                    url, parameters = form_parser(html_content, username, password)
-                    if url is None:
+                    url_str, parameters = form_parser(html_content, username, password)
+                    if url_str is None:
                         url = commitments_resp.url
+                    else:
+                        url = commitments_resp.url.join(URL(url_str))
+
                     oauth2_resp = await session.post(url, data=parameters)
 
                     if oauth2_resp.status != 200:

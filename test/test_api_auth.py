@@ -102,6 +102,38 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip
+async def test_auth_get_tokens_with_form_parser_url_none(pkey, startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    url = URL('http://notused')
+    api = DsnetApi(
+        url,
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
+        repository,
+        message_retriever=AddressMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        secret_key=b"dummy"
+    )
+    assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: (None, {'username': 'johndoe', 'password': 'secret'}))
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip
+async def test_auth_get_tokens_with_form_parser_url_relative(pkey, startup_and_shutdown_servers):
+    repository = SqlalchemyRepository(database)
+    url = URL('http://notused')
+    api = DsnetApi(
+        url,
+        URL(f'http://localhost:{TOKEN_SERVER_PORT}'),
+        repository,
+        message_retriever=AddressMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        secret_key=b"dummy"
+    )
+    assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: ('/signin', {'username': 'johndoe', 'password': 'secret'}))
+
+
+@pytest.mark.asyncio
 async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
     url = URL('http://notused')
