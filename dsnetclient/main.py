@@ -7,6 +7,8 @@ from pathlib import Path
 from random import expovariate, getrandbits
 from typing import List, Optional
 
+import alembic.config
+
 from dsnetclient.form_parser import bs_parser
 
 try:
@@ -229,6 +231,21 @@ def gen_keys(private_key: str, public_key: str, num_other_public_keys: str):
 
 
 @cli.command()
+@click.option('--database-url', prompt='Database file', help='Sqlite url ex: sqlite:///path/to/sqlfile')
+def migrate(database_url: str) -> None:
+    _migrate(database_url)
+
+
+def _migrate(database_url: str) -> None:
+    args = [
+        '--raiseerr',
+        '-x', f'dbPath={database_url}',
+        'upgrade', 'head'
+    ]
+    alembic.config.main(argv=args)
+
+
+@cli.command()
 @click.option('--server-url', prompt='Server url', help='The http url where the server can be joined')
 @click.option('--token-server-url', prompt='Token server url', help='The http url where the token server can be joined')
 @click.option('--private-key', prompt='User private key', help='Private key file (prefix with @)')
@@ -265,6 +282,8 @@ def shell(server_url, token_server_url, private_key, database_url,
         message_retriever = ProbabilisticCoverMessageRetriever(
             URL(server_url), SqlalchemyRepository(database_url), lambda: bool(getrandbits(1))
         )
+
+    _migrate(database_url)
 
     Demo(
         URL(server_url),
