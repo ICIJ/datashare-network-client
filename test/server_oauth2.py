@@ -130,17 +130,19 @@ async def read_users_me(request: Request):
     token = authorization_header.replace('Bearer ', '')
     return JSONResponse(get_current_user(token).view())
 
+def setup_app():
+    routes = [
+        Route('/oauth/authorize', authorize, methods=['GET']),
+        Route('/oauth/token', token, methods=['POST']),
+        Route('/signin', signin, methods=['POST']),
+        Route('/signin', get_form, methods=['GET']),
+        Route('/api/me.json', read_users_me, methods=['GET']),
+    ]
 
-routes = [
-    Route('/oauth/authorize', authorize, methods=['GET']),
-    Route('/oauth/token', token, methods=['POST']),
-    Route('/signin', signin, methods=['POST']),
-    Route('/signin', get_form, methods=['GET']),
-    Route('/api/me.json', read_users_me, methods=['GET']),
-]
+    app = Starlette(routes=routes, middleware=[Middleware(SessionMiddleware, secret_key="foo")])
+    return app
 
-app = Starlette(routes=routes, middleware=[Middleware(SessionMiddleware, secret_key="foo")])
-
+app = setup_app()
 
 if __name__ == '__main__':
     import uvicorn

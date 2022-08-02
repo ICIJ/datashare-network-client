@@ -1,13 +1,15 @@
-import os
 
 import databases
 import pytest
 import pytest_asyncio
 from dsnet.token import AbeToken
 from sqlalchemy import create_engine
-from sscred.blind_signature import AbeParam, AbePublicKey
-from sscred.pack import packb
+from sscred.blind_signature import AbePublicKey, AbePrivateKey
+from sscred.pack import unpackb
 from yarl import URL
+from starlette.config import environ
+
+from tokenserver.main import setup_app as tokenserver_setup_app
 
 from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
 from dsnetclient.form_parser import bs_parser
@@ -16,22 +18,17 @@ from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository
 from test.server import UvicornTestServer
+from test.server_oauth2 import setup_app as oauth2_setup_app
 
 DATABASE_URL = 'sqlite:///auth_test.db'
 database = databases.Database(DATABASE_URL)
-pkey = None
-TOKEN_SERVER_PORT = 12345
-os.environ['TOKEN_SERVER_PORT'] = str(TOKEN_SERVER_PORT)
-os.environ['TOKEN_SERVER_NBTOKENS'] = str(3)
 
+TOKEN_SERVER_PORT = 12345
 
 @pytest.fixture
 def pkey():
-    global pkey
-    params = AbeParam()
-    skey, pkey = params.generate_new_key_pair()
-    os.environ['TOKEN_SERVER_SKEY'] = packb(skey).hex()
-    return pkey
+    skey: AbePrivateKey = unpackb(bytes.fromhex(environ['TOKEN_SERVER_SKEY']))
+    return skey.public_key()
 
 
 @pytest_asyncio.fixture
@@ -45,9 +42,9 @@ async def connect_disconnect_db():
 
 
 @pytest_asyncio.fixture
-async def startup_and_shutdown_servers(connect_disconnect_db, pkey):
-    id_server = UvicornTestServer('test.server_oauth2:app', port=12346)
-    token_server = UvicornTestServer('tokenserver.main:app', port=TOKEN_SERVER_PORT)
+async def startup_and_shutdown_servers(connect_disconnect_db):
+    id_server = UvicornTestServer(oauth2_setup_app(), port=12346)
+    token_server = UvicornTestServer(tokenserver_setup_app(), port=TOKEN_SERVER_PORT)
     await id_server.up()
     await token_server.up()
     yield
@@ -68,6 +65,7 @@ async def test_fetch_token_not_authenticated(startup_and_shutdown_servers):
     )
     with pytest.raises(InvalidAuthorizationResponse):
         await api.fetch_pre_tokens(None, None, None)
+    await api.close()
 
 
 @pytest.mark.asyncio
@@ -83,10 +81,10 @@ async def test_fetch_token_with_authentication_bad_login(startup_and_shutdown_se
     )
     with pytest.raises(InvalidAuthorizationResponse):
         await api.fetch_pre_tokens('user', 'bad_password', bs_parser)
+    await api.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip
 async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers, pkey):
     repository = SqlalchemyRepository(database)
     await repository.save_token_server_key(pkey)
@@ -99,10 +97,10 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
         secret_key=b"dummy",
     )
     assert 0 == await api.fetch_pre_tokens('johndoe', 'secret', bs_parser)
+    await api.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip
 async def test_auth_get_tokens_with_form_parser_url_none(pkey, startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
     url = URL('http://notused')
@@ -115,10 +113,10 @@ async def test_auth_get_tokens_with_form_parser_url_none(pkey, startup_and_shutd
         secret_key=b"dummy"
     )
     assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: (None, {'username': 'johndoe', 'password': 'secret'}))
+    await api.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip
 async def test_auth_get_tokens_with_form_parser_url_relative(pkey, startup_and_shutdown_servers):
     repository = SqlalchemyRepository(database)
     url = URL('http://notused')
@@ -131,6 +129,7 @@ async def test_auth_get_tokens_with_form_parser_url_relative(pkey, startup_and_s
         secret_key=b"dummy"
     )
     assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: ('/signin', {'username': 'johndoe', 'password': 'secret'}))
+    await api.close()
 
 
 @pytest.mark.asyncio
@@ -158,3 +157,4 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is not None
     assert (await repository.pop_token()) is None
+    await api.close()
