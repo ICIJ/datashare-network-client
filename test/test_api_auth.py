@@ -9,7 +9,8 @@ from sscred.pack import unpackb
 from yarl import URL
 from starlette.config import environ
 
-from tokenserver.main import setup_app as tokenserver_setup_app
+import tokenserver.main
+import tokenserver.test.server_oauth2
 
 from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
 from dsnetclient.form_parser import bs_parser
@@ -17,8 +18,8 @@ from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository
-from test.server import UvicornTestServer
-from test.server_oauth2 import setup_app as oauth2_setup_app
+from tokenserver.test.server import UvicornTestServer
+
 
 DATABASE_URL = 'sqlite:///auth_test.db'
 database = databases.Database(DATABASE_URL)
@@ -43,8 +44,8 @@ async def connect_disconnect_db():
 
 @pytest_asyncio.fixture
 async def startup_and_shutdown_servers(connect_disconnect_db):
-    id_server = UvicornTestServer(oauth2_setup_app(), port=12346)
-    token_server = UvicornTestServer(tokenserver_setup_app(), port=TOKEN_SERVER_PORT)
+    id_server = UvicornTestServer(tokenserver.test.server_oauth2.setup_app(), port=12346)
+    token_server = UvicornTestServer(tokenserver.main.setup_app(), port=TOKEN_SERVER_PORT)
     await id_server.up()
     await token_server.up()
     yield

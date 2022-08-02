@@ -17,7 +17,7 @@ from dsnetclient.message_retriever import AddressMatchMessageRetriever, Probabil
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository, Peer
-from test.server import UvicornTestServer
+from tokenserver.test.server import UvicornTestServer
 from test.test_utils import create_tokens
 
 DATABASE_URL = 'sqlite:///dsnet.db'
@@ -39,7 +39,7 @@ async def connect_disconnect_db():
 
 @pytest_asyncio.fixture
 async def startup_and_shutdown_server():
-    server = UvicornTestServer('dsnetserver.main:app')
+    server = UvicornTestServer('dsnetserver.main:app', port=12345)
     await server.up()
     yield
     await server.down()

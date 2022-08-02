@@ -18,7 +18,7 @@ beautifulsoup4 = '*'
 pytest-httpserver = "==1.0.4"
 alembic = "==1.7.7"
 datashare-network-server = {editable = true, ref = "14339b5da72c86c25089802697ca709f1fe841dd", git = "https://github.com/ICIJ/datashare-network-server.git"}
-datashare-network-tokenserver = {editable = true, ref = "2ce25e70ffebdb13db0d44abc2ecb56246b3e16f", git = "https://github.com/ICIJ/datashare-network-tokenserver.git"}
+datashare-network-tokenserver = {editable = true, ref = "f28cd151d076b83042dde87eab99e5a8cab3b480", git = "https://github.com/ICIJ/datashare-network-tokenserver.git"}
 uvicorn = {extras = ["standard"], version = "==0.15.0"}
 pytest = "==7.1.0"
 pytest-asyncio = "==0.18.2"
