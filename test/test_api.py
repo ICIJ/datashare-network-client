@@ -13,7 +13,7 @@ from werkzeug import Response
 from yarl import URL
 
 from dsnetclient.api import DsnetApi, NoTokenException, InvalidAuthorizationResponse
-from dsnetclient.index import MemoryIndex, Index
+from dsnetclient.index import MemoryIndex, NamedEntity, NamedEntityCategory
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata
@@ -32,6 +32,14 @@ async def connect_disconnect_db():
     yield
     metadata.drop_all(engine)
     await database.disconnect()
+
+
+@pytest.fixture
+def memory_index() -> MemoryIndex:
+    return MemoryIndex([
+        NamedEntity("doc_id", NamedEntityCategory.PERSON, "foo"),
+        NamedEntity("doc_id", NamedEntityCategory.PERSON, "bar"),
+    ])
 
 
 @pytest.mark.asyncio
@@ -56,6 +64,20 @@ async def test_send_query(httpserver: HTTPServer, connect_disconnect_db):
 
 
 @pytest.mark.asyncio
+async def test_send_publication(httpserver: HTTPServer, memory_index: MemoryIndex, connect_disconnect_db):
+    httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
+    api = await create_api(httpserver, memory_index)
+
+    await api.send_publication()
+    httpserver.check()
+
+    publications = await api.repository.get_publications()
+    assert len(publications) == 1
+    assert publications[0].nb_docs == 1
+    assert publications[0].nym == await api.repository.get_parameter("nym")
+
+
+@pytest.mark.asyncio
 async def test_send_response(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
     api = await create_api(httpserver)
@@ -69,9 +91,9 @@ async def test_send_response(httpserver: HTTPServer, connect_disconnect_db):
 
 
 @pytest.mark.asyncio
-async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_db):
+async def test_receive_query_matches(httpserver: HTTPServer, memory_index: MemoryIndex, connect_disconnect_db):
     httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
-    api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
+    api = await create_api(httpserver, memory_index)
     token = await api.repository.pop_token()
 
     await api.handle_query(Query.create(gen_key_pair().public, token,  b'foo'))
@@ -85,7 +107,7 @@ async def test_receive_query_matches(httpserver: HTTPServer, connect_disconnect_
 @pytest.mark.asyncio
 async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disconnect_db):
     httpserver.expect_request(re.compile(r"/ph/.+"), method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
-    api = await create_api(httpserver, MemoryIndex(set()))
+    api = await create_api(httpserver, MemoryIndex([]))
     token = await api.repository.pop_token()
 
     await api.handle_query(Query.create(gen_key_pair().public, token,  b'foo'))
@@ -96,8 +118,8 @@ async def test_receive_query_does_not_match(httpserver: HTTPServer, connect_disc
 
 
 @pytest.mark.asyncio
-async def test_receive_query_wrong_signature(httpserver: HTTPServer, connect_disconnect_db):
-    api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
+async def test_receive_query_wrong_signature(httpserver: HTTPServer, memory_index: MemoryIndex, connect_disconnect_db):
+    api = await create_api(httpserver, memory_index)
     token = await api.repository.pop_token()
     query = Query.create(gen_key_pair().public, token,  b'foo')
     query.signature = b"Wrong signature"
@@ -110,9 +132,9 @@ async def test_receive_query_wrong_signature(httpserver: HTTPServer, connect_dis
 
 
 @pytest.mark.asyncio
-async def test_do_treat_my_own_query(httpserver: HTTPServer, connect_disconnect_db):
+async def test_do_treat_my_own_query(httpserver: HTTPServer, memory_index: MemoryIndex, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
-    api = await create_api(httpserver, MemoryIndex({'foo', 'bar'}))
+    api = await create_api(httpserver, memory_index)
 
     await api.send_query(b'foo')
 

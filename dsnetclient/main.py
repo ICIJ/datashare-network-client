@@ -26,7 +26,7 @@ from yarl import URL
 
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
-from dsnetclient.index import MemoryIndex, Index, LuceneIndex
+from dsnetclient.index import MemoryIndex, Index, LuceneIndex, NamedEntity, NamedEntityCategory
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
@@ -270,8 +270,8 @@ def shell(server_url, token_server_url, private_key, database_url,
     else:
         with open(entities_file, "r") as f:
             my_entities = f.readlines()
-        my_entities = [e.strip('\n') for e in my_entities]
-        index = MemoryIndex(set(my_entities))
+        entities = [NamedEntity("doc_id", NamedEntityCategory.PERSON, e.strip('\n')) for e in my_entities]
+        index = MemoryIndex(entities)
 
     message_sender = None
     message_retriever = None

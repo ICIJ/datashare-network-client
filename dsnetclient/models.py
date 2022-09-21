@@ -3,6 +3,22 @@ from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey
 # Database table definitions.
 metadata = MetaData()
 
+parameter_table = Table(
+    "parameter",
+    metadata,
+    Column("key", String(16), primary_key=True),
+    Column("value", String(36), nullable=False),
+)
+
+publication_table = Table(
+    "publication",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("secret_key", LargeBinary, unique=False, nullable=False),
+    Column("nym", String(16), index=True, nullable=False),
+    Column("nb_docs", Integer, nullable=False),
+    Column("created_at", DateTime, index=True, nullable=False),
+)
 
 peer_table = Table(
     "peer",
@@ -10,7 +26,6 @@ peer_table = Table(
     Column("id", Integer, primary_key=True),
     Column("public_key", LargeBinary, unique=True, index=True, nullable=False)
 )
-
 
 conversation_table = Table(
     "conversation",

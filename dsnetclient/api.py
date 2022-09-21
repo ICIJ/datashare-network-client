@@ -1,13 +1,15 @@
 import asyncio
+import uuid
 from asyncio import Task
 from typing import Awaitable, Callable, Tuple, List
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError, InvalidURL
+from cuckoopy_mod import CuckooFilter
 from dsnet.core import Conversation, Query
-from dsnet.crypto import gen_key_pair
+from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
-from dsnet.message import Message, MessageType, PigeonHoleNotification
+from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage
 from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
 from sscred import (
@@ -19,11 +21,11 @@ from sscred import (
 )
 from yarl import URL
 
-from dsnetclient.index import Index, MemoryIndex
+from dsnetclient.index import Index, MemoryIndex, NamedEntity, NamedEntityCategory
 from dsnetclient.message_retriever import MessageRetriever, AddressMatchMessageRetriever
 from dsnetclient.message_sender import MessageSender, DirectMessageSender
 from dsnetclient.models import metadata
-from dsnetclient.repository import Repository, SqlalchemyRepository
+from dsnetclient.repository import Repository, SqlalchemyRepository, Publication
 
 
 class NoTokenException(Exception):
@@ -204,6 +206,27 @@ class DsnetApi:
                 return len(tokens)
         return 0
 
+    async def send_publication(self):
+        key_pair = gen_key_pair()
+        cuckoo_filter = CuckooFilter(capacity=1000, bucket_size=6, fingerprint_size=4)
+        docs = set()
+        for ne in await self.index.publish():
+            cuckoo_filter.insert(ne.mention.encode("utf-8"))
+            if not ne.document_id in docs:
+                docs.add(ne.document_id)
+        nym = await self.repository.get_parameter("nym")
+
+        if nym is None:
+            nym = str(uuid.uuid4())
+            await self.repository.set_parameter("nym", nym)
+
+        payload = PublicationMessage(nym, key_pair.public, cuckoo_filter, len(docs)).to_bytes()
+        async with ClientSession() as session:
+            async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
+                response.raise_for_status()
+
+        await self.repository.save_publication(Publication(key_pair.secret, nym, len(docs)))
+
 
 def main():
     # for testing
@@ -219,7 +242,10 @@ def main():
         token_url,
         repository,
         keys.secret,
-        index=MemoryIndex({"foo", "bar"}),
+        index=MemoryIndex([
+            NamedEntity("doc_id", NamedEntityCategory.PERSON, "foo"),
+            NamedEntity("doc_id", NamedEntityCategory.PERSON, "bar"),
+        ]),
         message_retriever=AddressMatchMessageRetriever(URL(dburl), repository),
         message_sender=DirectMessageSender(URL(dburl)),
     )

@@ -20,7 +20,6 @@ class NamedEntityCategory(Enum):
 
 
 class NamedEntity:
-
     def __init__(self, document_id: str, category: NamedEntityCategory, mention: str):
         self.document_id = document_id
         self.mention = mention
@@ -106,12 +105,16 @@ class LuceneIndex(Index):
 
 
 class MemoryIndex(Index):
-    def __init__(self, entities: Set[str]):
+    def __init__(self, entities: List[NamedEntity]):
         self.entities = entities
+
+    async def publish(self) -> Generator[NamedEntity, None, None]:
+        return (e for e in self.entities)
 
     async def search(self, query: bytes) -> bytes:
         term_list = set(query.decode().split())
-        return dumps(list(term_list.intersection(self.entities))).encode()
+        entities = set((e.mention for e in self.entities))
+        return dumps(list(term_list.intersection(entities))).encode()
 
     async def close(self) -> None:
         pass

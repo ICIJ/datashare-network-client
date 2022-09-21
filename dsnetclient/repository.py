@@ -3,7 +3,7 @@ import datetime
 import sqlite3
 from collections import defaultdict
 from operator import attrgetter
-from typing import List, Mapping, Optional, NamedTuple
+from typing import List, Mapping, Optional
 
 from cryptography.hazmat.primitives._serialization import Encoding, PrivateFormat, NoEncryption
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -17,13 +17,23 @@ from sqlalchemy.sql import Select
 from sscred import packb, unpackb, AbePublicKey
 from sqlalchemy.sql.expression import func
 
-from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, token_table
+from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, \
+    token_table, parameter_table, publication_table
 
 
 class Peer:
     def __init__(self, public_key: bytes, id=None):
         self.id = id
         self.public_key = public_key
+
+
+class Publication:
+    def __init__(self, secret_key: bytes, nym: str, nb_docs: int, created_at: Optional[datetime.datetime] = None, id = None):
+        self.id = id
+        self.created_at = created_at
+        self.nb_docs = nb_docs
+        self.nym = nym
+        self.secret_key = secret_key
 
 
 class Repository(metaclass=abc.ABCMeta):
@@ -180,6 +190,31 @@ class Repository(metaclass=abc.ABCMeta):
     async def get_last_message_timestamp(self) -> datetime.datetime:
         """
         :return: the last message timestamp
+        """
+
+    @abc.abstractmethod
+    async def set_parameter(self, key: str, value: str) -> None:
+        """
+        sets a parameter key/value in database
+        """
+
+    @abc.abstractmethod
+    async def get_parameter(self, key: str) -> str:
+        """
+        gets a parameter from its key
+        """
+
+    @abc.abstractmethod
+    async def get_publications(self) -> List[Publication]:
+        """
+        :return: the list of all publications
+        """
+    
+    @abc.abstractmethod
+    async def save_publication(self, publication: Publication) -> None:
+        """
+        Save a publication
+        :param publication: the publication to save
         """
 
 
@@ -396,3 +431,25 @@ class SqlalchemyRepository(Repository):
     async def get_tokens(self) -> List[AbeToken]:
         return [AbeToken(Ed25519PrivateKey.from_private_bytes(r['secret_key']), unpackb(r['token']))
                 for r in await self.database.fetch_all(token_table.select())]
+
+    async def set_parameter(self, key, value):
+        stmt = insert(parameter_table).values({'key': key, 'value': value})
+        return await self.database.execute(stmt)
+
+    async def get_parameter(self, key):
+        stmt = parameter_table.select().where(parameter_table.c.key==key)
+        row = await self.database.fetch_one(stmt)
+        return row['value'] if row is not None else None
+
+    async def get_publications(self) -> List[Publication]:
+        return [Publication(**row) for row in await self.database.fetch_all(publication_table.select())]
+
+    async def save_publication(self, publication: Publication) -> None:
+        data = {
+            "secret_key": publication.secret_key,
+            "nym": publication.nym,
+            "nb_docs": publication.nb_docs,
+            "created_at": datetime.datetime.utcnow()
+        }
+        stmt = insert(publication_table).values(data)
+        return await self.database.execute(stmt)

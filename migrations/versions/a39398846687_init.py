@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 229d852deeec
+Revision ID: a39398846687
 Revises: 
-Create Date: 2022-03-29 08:52:41.084965
+Create Date: 2022-09-21 15:47:59.499214
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '229d852deeec'
+revision = 'a39398846687'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -30,12 +30,27 @@ def upgrade():
     )
     op.create_index(op.f('ix_conversation_other_public_key'), 'conversation', ['other_public_key'], unique=False)
     op.create_index(op.f('ix_conversation_public_key'), 'conversation', ['public_key'], unique=False)
+    op.create_table('parameter',
+    sa.Column('key', sa.String(length=16), nullable=False),
+    sa.Column('value', sa.String(length=36), nullable=False),
+    sa.PrimaryKeyConstraint('key')
+    )
     op.create_table('peer',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('public_key', sa.LargeBinary(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_peer_public_key'), 'peer', ['public_key'], unique=True)
+    op.create_table('publication',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('secret_key', sa.LargeBinary(), nullable=False),
+    sa.Column('nym', sa.String(length=16), nullable=False),
+    sa.Column('nb_docs', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_publication_created_at'), 'publication', ['created_at'], unique=False)
+    op.create_index(op.f('ix_publication_nym'), 'publication', ['nym'], unique=False)
     op.create_table('server_key',
     sa.Column('master_key', sa.LargeBinary(), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
@@ -80,8 +95,12 @@ def downgrade():
     op.drop_table('message')
     op.drop_table('token')
     op.drop_table('server_key')
+    op.drop_index(op.f('ix_publication_nym'), table_name='publication')
+    op.drop_index(op.f('ix_publication_created_at'), table_name='publication')
+    op.drop_table('publication')
     op.drop_index(op.f('ix_peer_public_key'), table_name='peer')
     op.drop_table('peer')
+    op.drop_table('parameter')
     op.drop_index(op.f('ix_conversation_public_key'), table_name='conversation')
     op.drop_index(op.f('ix_conversation_other_public_key'), table_name='conversation')
     op.drop_table('conversation')

@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sscred import AbeParam
 
 from dsnetclient.models import metadata
-from dsnetclient.repository import SqlalchemyRepository, Peer
+from dsnetclient.repository import SqlalchemyRepository, Peer, Publication
 from test.test_utils import create_tokens
 
 DATABASE_URL = 'sqlite:///dsnet.db'
@@ -298,3 +298,30 @@ async def test_get_tokens(connect_disconnect_db):
 
     await repository.save_tokens(tokens)
     assert await repository.get_tokens() == tokens
+
+
+@pytest.mark.asyncio
+async def test_set_get_parameter(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    await repository.set_parameter("foo", "bar")
+    assert await repository.get_parameter("foo") == "bar"
+
+
+@pytest.mark.asyncio
+async def test_set_get_parameter_no_value(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    assert await repository.get_parameter("foo") is None
+
+
+@pytest.mark.asyncio
+async def test_save_and_get_publication(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    await repository.save_publication(Publication(b"secret", "nym", 4))
+    publications = await repository.get_publications()
+
+    assert len(publications) == 1
+    assert publications[0].nym == "nym"
+    assert publications[0].secret_key == b"secret"
+    assert publications[0].created_at is not None
+
+
