@@ -214,11 +214,8 @@ class DsnetApi:
             cuckoo_filter.insert(ne.mention.encode("utf-8"))
             if not ne.document_id in docs:
                 docs.add(ne.document_id)
-        nym = await self.repository.get_parameter("nym")
 
-        if nym is None:
-            nym = str(uuid.uuid4())
-            await self.repository.set_parameter("nym", nym)
+        nym = await self.get_or_create_nym()
 
         payload = PublicationMessage(nym, key_pair.public, cuckoo_filter, len(docs)).to_bytes()
         async with ClientSession() as session:
@@ -226,6 +223,13 @@ class DsnetApi:
                 response.raise_for_status()
 
         await self.repository.save_publication(Publication(key_pair.secret, nym, len(docs)))
+
+    async def get_or_create_nym(self):
+        nym = await self.repository.get_parameter("nym")
+        if nym is None:
+            nym = str(uuid.uuid4())
+            await self.repository.set_parameter("nym", nym)
+        return nym
 
 
 def main():
