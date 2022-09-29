@@ -1,0 +1,31 @@
+{
+  "from": 0,
+  "size": 10,
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "type": "Document"
+          }
+        },
+        {
+          "has_child": {
+            "type": "NamedEntity",
+            "query": {
+              "match_all": {}
+            },
+            "inner_hits": {
+              "size": 100
+            }
+          }
+        }
+      ]
+    }
+  },
+  "_source": {
+    "includes": [
+      "extractionDate"
+    ]
+  }
+}

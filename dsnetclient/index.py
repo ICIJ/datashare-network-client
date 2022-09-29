@@ -1,7 +1,9 @@
 import abc
+import datetime
+
 from enum import Enum
 from json import dumps
-from typing import Set, List, Generator, Optional
+from typing import List, Generator, Tuple, Dict
 
 from elasticsearch import AsyncElasticsearch
 
@@ -31,9 +33,11 @@ class NamedEntity:
 
 
 class Document:
-    def __init__(self, id: str, named_entities: List[NamedEntity]) -> None:
+    def __init__(self, id: str, creation_date: datetime.datetime, content: str = "") -> None:
+        self.type = "Document"
         self.identifier = id
-        self.named_entities = named_entities
+        self.content = content
+        self.creation_date = creation_date
 
 
 class Index(metaclass=abc.ABCMeta):
@@ -49,10 +53,17 @@ class Index(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def publish(self) -> Generator[NamedEntity, None, None]:
+    async def publish(self) -> Tuple[int, Generator[NamedEntity, None, None]]:
         """
         publish method to publish the current documents' named entities
         :return: A generator iterating over the named entities contained in a document.
+        """
+
+    @abc.abstractmethod
+    async def get_documents(self) -> Dict[str, Document]:
+        """
+        Retrieve documents.
+        :return: Dict of documents by document id.
         """
 
     @abc.abstractmethod
@@ -67,14 +78,19 @@ class LuceneIndex(Index):
         self.index_name = index_name
         self.aes = aes
 
-    async def publish(self) -> Generator[NamedEntity, None, None]:
+    async def get_documents(self) -> Dict[str, Document]:
+        resp = await self.aes.search(index=self.index_name, body=self.query_documents_body())
+        return {
+            hit["_id"]: Document(hit["_id"], hit["_source"]["creationDate"]) for hit in resp["hits"]["hits"]
+        }
+
+    async def publish(self) -> Tuple[int, Generator[NamedEntity, None, None]]:
         resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string("*"))
-        for hit in resp["hits"]["hits"]:
-            yield NamedEntity(
-                hit["_routing"],
-                NamedEntityCategory[hit["_source"]["category"]],
-                hit["_source"]["mention"]
-            )
+        return resp["hits"]["total"]["value"], (NamedEntity(
+            hit["_routing"],
+            NamedEntityCategory[hit["_source"]["category"]],
+            hit["_source"]["mention"]
+        ) for hit in resp["hits"]["hits"])
 
     async def search(self, query: bytes) -> bytes:
         resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string(query.decode()))
@@ -100,13 +116,37 @@ class LuceneIndex(Index):
             }
         }
 
+    def query_documents_body(self) -> dict:
+        return {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "type": "Document"
+                            }
+                        },
+                        {
+                            "has_child": {
+                                "type": "NamedEntity",
+                                "query": {
+                                    "match_all": {}
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
     async def close(self):
         await self.aes.close()
 
 
 class MemoryIndex(Index):
-    def __init__(self, entities: List[NamedEntity]):
+    def __init__(self, entities: List[NamedEntity], documents: List[Document]):
         self.entities = entities
+        self.documents = documents
 
     async def publish(self) -> Generator[NamedEntity, None, None]:
         return (e for e in self.entities)
@@ -115,6 +155,9 @@ class MemoryIndex(Index):
         term_list = set(query.decode().split())
         entities = set((e.mention for e in self.entities))
         return dumps(list(term_list.intersection(entities))).encode()
+
+    async def get_documents(self) -> Dict[str, Document]:
+        return { d.identifier: d for d in self.documents }
 
     async def close(self) -> None:
         pass

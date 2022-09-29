@@ -5,11 +5,11 @@ from typing import Awaitable, Callable, Tuple, List
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError, InvalidURL
-from cuckoopy_mod import CuckooFilter
 from dsnet.core import Conversation, Query
 from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
 from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage
+from dsnet.mspsi import MSPSIDocumentOwner
 from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
 from sscred import (
@@ -208,16 +208,13 @@ class DsnetApi:
 
     async def send_publication(self):
         key_pair = gen_key_pair()
-        cuckoo_filter = CuckooFilter(capacity=1000, bucket_size=6, fingerprint_size=4)
         docs = set()
-        for ne in await self.index.publish():
-            cuckoo_filter.insert(ne.mention.encode("utf-8"))
-            if not ne.document_id in docs:
-                docs.add(ne.document_id)
+        n_hits, generator = await self.index.publish()
+        secret, publication = MSPSIDocumentOwner.publish((ne.mention.encode() for ne in generator), n_hits)
 
         nym = await self.get_or_create_nym()
 
-        payload = PublicationMessage(nym, key_pair.public, cuckoo_filter, len(docs)).to_bytes()
+        payload = PublicationMessage(nym, key_pair.public, publication, len(docs)).to_bytes()
         async with ClientSession() as session:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
