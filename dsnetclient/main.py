@@ -190,6 +190,14 @@ class Demo(Cmd):
         return False
 
     @asynccmd
+    async def do_publish(self, _) -> Optional[bool]:
+        """
+        publish MSPSI index of hashes
+        """
+        await self.api.send_publication()
+        return False
+
+    @asynccmd
     async def do_EOF(self, line):
         """
         type CTRL+D or CTRL+C to exit
