@@ -208,18 +208,18 @@ class DsnetApi:
 
     async def send_publication(self):
         key_pair = gen_key_pair()
-        docs = set()
         n_hits, generator = await self.index.publish()
-        secret, publication = MSPSIDocumentOwner.publish((ne.mention.encode() for ne in generator), n_hits)
+        documents = await self.index.get_documents()
+        secret, publication = MSPSIDocumentOwner.publish(generator, documents, n_hits)
 
         nym = await self.get_or_create_nym()
 
-        payload = PublicationMessage(nym, key_pair.public, publication, len(docs)).to_bytes()
+        payload = PublicationMessage(nym, key_pair.public, publication, len(documents)).to_bytes()
         async with ClientSession() as session:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
 
-        await self.repository.save_publication(Publication(key_pair.secret, nym, len(docs)))
+        await self.repository.save_publication(Publication(key_pair.secret, nym, len(documents)))
 
     async def get_or_create_nym(self):
         nym = await self.repository.get_parameter("nym")

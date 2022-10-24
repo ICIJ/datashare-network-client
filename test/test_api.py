@@ -65,7 +65,6 @@ async def test_send_query(httpserver: HTTPServer, connect_disconnect_db):
     assert conversations[0].query == b'raw query'
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_send_publication(httpserver: HTTPServer, memory_index: MemoryIndex, connect_disconnect_db):
     httpserver.expect_request("/bb/broadcast", method='POST', handler_type=HandlerType.ORDERED).respond_with_response(Response(status=200))
