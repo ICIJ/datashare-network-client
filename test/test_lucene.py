@@ -107,7 +107,7 @@ class TestIndexer:
     async def commit(self) -> None:
         for doc in self.documents:
             print(doc)
-            await self.aes.index(self.index_name,  id=doc.identifier, body={"creationDate": doc.creation_date.isoformat(), "type": doc.type, "join": {"name": "Document"}})
+            await self.aes.index(self.index_name,  id=doc.identifier, body={"extractionDate": doc.creation_date, "type": doc.type, "join": {"name": "Document"}})
         for ne in self.named_entities:
             print(ne)
             await self.aes.index(self.index_name,

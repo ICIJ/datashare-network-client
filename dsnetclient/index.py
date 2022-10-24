@@ -1,7 +1,9 @@
 import abc
+import datetime
 from json import dumps
 from typing import List, Generator, Tuple, Dict, Iterator
 
+from dateutil.parser import isoparse
 from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory
 from elasticsearch import AsyncElasticsearch
 
@@ -47,7 +49,7 @@ class LuceneIndex(Index):
     async def get_documents(self) -> List[Document]:
         resp = await self.aes.search(index=self.index_name, body=self.query_documents_body())
         return [
-            Document(hit["_id"], hit["_source"]["creationDate"]) for hit in resp["hits"]["hits"]
+            Document(hit["_id"], hit["_source"]["extractionDate"]) for hit in resp["hits"]["hits"]
         ]
 
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:

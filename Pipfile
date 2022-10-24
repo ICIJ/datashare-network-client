@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = {editable = true, ref = "ea5321799a59449c46feb20f15acc19d7b1ee161", git = "https://github.com/ICIJ/datashare-network-core.git"}
+datashare-network-core = {editable = true, ref = "7bc51fbe4d6370bc6df432708e23c5a379e74d0c", git = "https://github.com/ICIJ/datashare-network-core.git"}
 aiohttp = "==3.8.1"
 click = "==8.0.4"
 aioconsole = "==0.4.1"
@@ -16,6 +16,7 @@ beautifulsoup4 = '==4.11.1'
 sqlalchemy = '==1.4.39'
 databases = {extras = ['sqlite'], version = '==0.6.0'}
 alembic = '==1.8.1'
+python-dateutil = '==2.8.2'
 
 [dev-packages]
 pytest-httpserver = "==1.0.4"

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "7703f3f81204805e00669e70085b11cce6044fd51779900ef3dffb635a292717"
+            "sha256": "6ced8267641ce84a27c1e1227acdbb7508ab187bcc4b7b29f1c47cc5fa9876aa"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -447,7 +447,7 @@
         "datashare-network-core": {
             "editable": true,
             "git": "https://github.com/ICIJ/datashare-network-core.git",
-            "ref": "ea5321799a59449c46feb20f15acc19d7b1ee161"
+            "ref": "7bc51fbe4d6370bc6df432708e23c5a379e74d0c"
         },
         "elasticsearch": {
             "hashes": [
@@ -931,6 +931,14 @@
             "markers": "python_version >= '3.6'",
             "version": "==4.0.0"
         },
+        "python-dateutil": {
+            "hashes": [
+                "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86",
+                "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"
+            ],
+            "index": "pypi",
+            "version": "==2.8.2"
+        },
         "rfc3986": {
             "extras": [
                 "idna2008"
@@ -947,6 +955,14 @@
                 "sha256:c05e6e2eb1c74736e8fa7cf5c8049df67bd9b1f81d961a14fb231d8553636dd5"
             ],
             "version": "==1.1"
+        },
+        "six": {
+            "hashes": [
+                "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926",
+                "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"
+            ],
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
+            "version": "==1.16.0"
         },
         "sniffio": {
             "hashes": [
@@ -1453,7 +1469,7 @@
         "datashare-network-core": {
             "editable": true,
             "git": "https://github.com/ICIJ/datashare-network-core.git",
-            "ref": "ea5321799a59449c46feb20f15acc19d7b1ee161"
+            "ref": "7bc51fbe4d6370bc6df432708e23c5a379e74d0c"
         },
         "datashare-network-server": {
             "editable": true,
@@ -1995,7 +2011,7 @@
                 "sha256:7c5599b102feddaa661c826c56ab4fee28bfd17f5abca1ebbe3e7f19d7c97983",
                 "sha256:8fefa2a1a1365bf5520aac41836fbee479da67864514bdb821f31ce07ce65349"
             ],
-            "markers": "python_version >= '3.7' and python_version < '4'",
+            "markers": "python_version >= '3.7' and python_version < '4.0'",
             "version": "==2.28.1"
         },
         "requests-toolbelt": {
@@ -2120,7 +2136,7 @@
                 "sha256:014da69369db5abbb2c3129faab6b985448e990e64477e6f3e0123300966566c",
                 "sha256:76058cb982e150fe3d17d2e2c42dc9ab53a5d258cd2df793dbc16489b55eccbd"
             ],
-            "markers": "python_version < '4' and python_full_version >= '3.6.1'",
+            "markers": "python_version < '4.0' and python_full_version >= '3.6.1'",
             "version": "==0.4.2"
         },
         "toml": {
