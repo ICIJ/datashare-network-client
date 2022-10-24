@@ -1,43 +1,9 @@
 import abc
-import datetime
-
-from enum import Enum
 from json import dumps
-from typing import List, Generator, Tuple, Dict
+from typing import List, Generator, Tuple, Dict, Iterator
 
+from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory
 from elasticsearch import AsyncElasticsearch
-
-
-class NamedEntityCategory(Enum):
-    ORGANIZATION = "ORGANIZATION"
-    PERSON = "PERSON"
-    LOCATION = "LOCATION"
-    UNKNOW = "UNKNOWN"
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return self.__repr__()
-
-
-class NamedEntity:
-    def __init__(self, document_id: str, category: NamedEntityCategory, mention: str):
-        self.document_id = document_id
-        self.mention = mention
-        self.category = category
-        self.type = "NamedEntity"
-
-    def __repr__(self):
-        return f"{self.category}:{self.mention}"
-
-
-class Document:
-    def __init__(self, id: str, creation_date: datetime.datetime, content: str = "") -> None:
-        self.type = "Document"
-        self.identifier = id
-        self.content = content
-        self.creation_date = creation_date
 
 
 class Index(metaclass=abc.ABCMeta):
@@ -53,7 +19,7 @@ class Index(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def publish(self) -> Tuple[int, Generator[NamedEntity, None, None]]:
+    async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
         """
         publish method to publish the current documents' named entities
         :return: A generator iterating over the named entities contained in a document.
@@ -84,7 +50,7 @@ class LuceneIndex(Index):
             hit["_id"]: Document(hit["_id"], hit["_source"]["creationDate"]) for hit in resp["hits"]["hits"]
         }
 
-    async def publish(self) -> Tuple[int, Generator[NamedEntity, None, None]]:
+    async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
         resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string("*"))
         return resp["hits"]["total"]["value"], (NamedEntity(
             hit["_routing"],
