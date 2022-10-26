@@ -17,6 +17,7 @@ from dsnetclient.index import MemoryIndex, NamedEntity, NamedEntityCategory, Doc
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata
+from dsnetclient.query_encoder import LuceneEncoder
 from dsnetclient.repository import SqlalchemyRepository, Peer
 from test.test_utils import create_tokens
 
@@ -220,6 +221,7 @@ async def create_api(httpserver, index=None, number_tokens=3):
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
+        query_encoder=LuceneEncoder(),
         secret_key=my_keys.secret,
         index=index
     )

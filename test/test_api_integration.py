@@ -16,6 +16,7 @@ from dsnetclient.api import DsnetApi
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
+from dsnetclient.query_encoder import LuceneEncoder
 from dsnetclient.repository import SqlalchemyRepository, Peer
 from tokenserver.test.server import UvicornTestServer
 from test.test_utils import create_tokens
@@ -54,7 +55,8 @@ async def test_root(startup_and_shutdown_server):
             None,
             secret_key=b"dummy",
             message_retriever=AddressMatchMessageRetriever(url, None),
-            message_sender=DirectMessageSender(url)
+            message_sender=DirectMessageSender(url),
+            query_encoder=LuceneEncoder()
         ).get_server_version() == \
            {'message': f'Datashare Network Server version {dsnetserver.__version__}',
             'core_version': dsnet.__version__,
@@ -86,7 +88,8 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
         repository,
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
-        message_sender=DirectMessageSender(url)
+        message_sender=DirectMessageSender(url),
+        query_encoder=LuceneEncoder()
     )
     api.background_listening(cb)
     await api.send_query(b'payload_value')
@@ -108,7 +111,8 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
         repository,
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
-        message_sender=DirectMessageSender(url)
+        message_sender=DirectMessageSender(url),
+        query_encoder=LuceneEncoder()
     )
     task = api.background_listening(dummy_cb)
     await api.close()
@@ -143,7 +147,8 @@ async def test_websocket_reconnect(connect_disconnect_db):
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        reconnect_delay_seconds=0.1
+        query_encoder=LuceneEncoder(),
+        reconnect_delay_seconds=0.1,
     )
     api.background_listening(cb)
 
@@ -179,7 +184,8 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
         repository,
         secret_key=keys_alice.secret,
         message_retriever=retriever,
-        message_sender=DirectMessageSender(url)
+        message_sender=DirectMessageSender(url),
+        query_encoder=LuceneEncoder()
     )
     api_bob = DsnetApi(
         url,
@@ -187,7 +193,8 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
         repository,
         secret_key=keys_bob.secret,
         message_retriever=retriever,
-        message_sender=DirectMessageSender(url)
+        message_sender=DirectMessageSender(url),
+        query_encoder=LuceneEncoder()
     )
 
     async def cb_alice(message: Message):

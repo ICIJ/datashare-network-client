@@ -13,6 +13,7 @@ import alembic.config
 from dsnet.mspsi import Document
 
 from dsnetclient.form_parser import bs_parser
+from dsnetclient.query_encoder import LuceneEncoder
 
 try:
     import readline
@@ -62,6 +63,7 @@ class Demo(Cmd):
             self.repository,
             message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
             message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
+            query_encoder=LuceneEncoder(),
             secret_key=self.private_key,
             index=index
         )

@@ -25,6 +25,7 @@ from dsnetclient.index import Index, MemoryIndex, NamedEntity, NamedEntityCatego
 from dsnetclient.message_retriever import MessageRetriever, AddressMatchMessageRetriever
 from dsnetclient.message_sender import MessageSender, DirectMessageSender
 from dsnetclient.models import metadata
+from dsnetclient.query_encoder import QueryEncoder
 from dsnetclient.repository import Repository, SqlalchemyRepository, Publication
 
 
@@ -44,9 +45,10 @@ class DsnetApi:
             secret_key: bytes,
             message_retriever: MessageRetriever,
             message_sender: MessageSender,
+            query_encoder: QueryEncoder,
             reconnect_delay_seconds=2,
             index: Index = None,
-        ) -> None:
+    ) -> None:
         self.token_url = token_url
         self.repository = repository
         self.base_url = url
@@ -57,6 +59,7 @@ class DsnetApi:
         self.ws = None
         self.message_retriever = message_retriever
         self.message_sender = message_sender
+        self.query_encoder = query_encoder
 
     async def get_server_version(self) -> dict:
         async with ClientSession() as session:
