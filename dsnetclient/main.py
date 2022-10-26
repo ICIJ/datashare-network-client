@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 from cmd import Cmd
 from functools import wraps
@@ -8,6 +9,7 @@ from random import expovariate, getrandbits
 from typing import List, Optional
 
 import alembic.config
+from dsnet.mspsi import Document
 
 from dsnetclient.form_parser import bs_parser
 
@@ -279,7 +281,7 @@ def shell(server_url, token_server_url, private_key, database_url,
         with open(entities_file, "r") as f:
             my_entities = f.readlines()
         entities = [NamedEntity("doc_id", NamedEntityCategory.PERSON, e.strip('\n')) for e in my_entities]
-        index = MemoryIndex(entities)
+        index = MemoryIndex(entities, [Document("doc_id", datetime.datetime.utcnow())])
 
     message_sender = None
     message_retriever = None
