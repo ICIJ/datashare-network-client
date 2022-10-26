@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 from cmd import Cmd
+from enum import Enum, unique
 from functools import wraps
 from getpass import getpass
 from pathlib import Path
@@ -35,6 +36,9 @@ from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
 
 
+SearchMode = Enum("SearchMode", "DPSI Lucene")
+
+
 def asynccmd(f):
     @wraps(f)
     def wrapper(*args, **kwds):
@@ -44,8 +48,10 @@ def asynccmd(f):
 
 class Demo(Cmd):
     def __init__(self, server_url: URL, token_url: URL, private_key: str, database_url, keys: List[str], index: Index,
-                 message_retriever=None, message_sender=None, history_file: Path = None, history_file_size=1000):
+                 search_mode: SearchMode, message_retriever=None, message_sender=None,
+                 history_file: Path = None, history_file_size=1000):
         super().__init__()
+        self.search_mode = search_mode
         self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
         self.public_key = get_public_key(self.private_key)
@@ -267,8 +273,9 @@ def _migrate(database_url: str) -> None:
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
 @click.option('--history-size', help="Client's history size", required=False, default=1000)
+@click.option('--search-mode', help='The search mode for the client', type=click.Choice(list(map(lambda x: x.name, SearchMode))), required=False, default='Lucene', callback=lambda ctx, param, value: SearchMode[value])
 def shell(server_url, token_server_url, private_key, database_url,
-          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size):
+          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size, search_mode: SearchMode):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -302,6 +309,7 @@ def shell(server_url, token_server_url, private_key, database_url,
         database_url,
         keys_list,
         index,
+        search_mode,
         history_file=history_file,
         history_file_size=history_size,
         message_retriever=message_retriever,
