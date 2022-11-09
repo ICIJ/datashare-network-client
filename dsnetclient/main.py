@@ -13,7 +13,7 @@ import alembic.config
 from dsnet.mspsi import Document
 
 from dsnetclient.form_parser import bs_parser
-from dsnetclient.query_encoder import LuceneEncoder
+from dsnetclient.query_encoder import LuceneEncoder, MSPSIEncoder, SearchMode
 
 try:
     import readline
@@ -35,9 +35,6 @@ from dsnetclient.message_retriever import AddressMatchMessageRetriever, Probabil
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
 from dsnetclient.repository import SqlalchemyRepository, Peer
-
-
-SearchMode = Enum("SearchMode", "DPSI Lucene")
 
 
 def asynccmd(f):
@@ -63,7 +60,7 @@ class Demo(Cmd):
             self.repository,
             message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
             message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
-            query_encoder=LuceneEncoder(),
+            query_encoder=MSPSIEncoder() if search_mode == SearchMode.DPSI else LuceneEncoder(),
             secret_key=self.private_key,
             index=index
         )

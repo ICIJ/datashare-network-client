@@ -1,13 +1,21 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Tuple, List
 
 from dsnet.mspsi import MSPSIQuerier
 from petlib.bn import Bn
 from sscred import packb, unpackb
 
+SearchMode = Enum("SearchMode", "DPSI Lucene")
+
 
 class QueryEncoder(ABC):
     """Query encoder"""
+    @abstractmethod
+    def search_mode(self) -> SearchMode:
+        """
+        return the search mode associated with the encoder
+        """
 
     @abstractmethod
     def encode(self, query: List[bytes]) -> Tuple[Bn, bytes]:
@@ -25,6 +33,9 @@ class QueryEncoder(ABC):
 
 
 class MSPSIEncoder(QueryEncoder):
+    def search_mode(self) -> SearchMode:
+        return SearchMode.DPSI
+
     def encode(self, kwds: List[bytes]) -> Tuple[Bn, bytes]:
         secret, kwds_enc = MSPSIQuerier.query(kwds)
         return secret, packb(kwds_enc)
@@ -34,6 +45,9 @@ class MSPSIEncoder(QueryEncoder):
 
 
 class LuceneEncoder(QueryEncoder):
+    def search_mode(self) -> SearchMode:
+        return SearchMode.Lucene
+
     def encode(self, kwds: List[bytes]) -> Tuple[Bn, bytes]:
         return Bn(), packb(kwds)
 
