@@ -1,11 +1,12 @@
 import abc
-import datetime
 from json import dumps
-from typing import List, Generator, Tuple, Dict, Iterator
+from typing import List, Tuple, Iterator
 
-from dateutil.parser import isoparse
-from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory
+from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory, MSPSIDocumentOwner
 from elasticsearch import AsyncElasticsearch
+from sscred import unpackb, packb
+
+from dsnetclient.repository import Repository
 
 
 class Index(metaclass=abc.ABCMeta):
@@ -16,8 +17,19 @@ class Index(metaclass=abc.ABCMeta):
     async def search(self, query: bytes) -> bytes:
         """
         search method from a simple query
-        :param query: string query
+        :param query: string query packb encoded
         :return:
+        """
+
+    """
+    processing search results when the query sender receives the document owner response
+    """
+    @abc.abstractmethod
+    async def process_search_results(self, results: bytes) -> bytes:
+        """
+        search method from a simple query
+        :param results: encoded results
+        :return: payload to store in local state
         """
 
     @abc.abstractmethod
@@ -45,6 +57,9 @@ class LuceneIndex(Index):
     def __init__(self, aes: AsyncElasticsearch, index_name: str = "local-datashare"):
         self.index_name = index_name
         self.aes = aes
+
+    async def process_search_results(self, results: bytes) -> bytes:
+        return results
 
     async def get_documents(self) -> List[Document]:
         resp = await self.aes.search(index=self.index_name, body=self.query_documents_body())
@@ -116,6 +131,9 @@ class MemoryIndex(Index):
         self.entities = entities
         self.documents = documents
 
+    async def process_search_results(self, results: bytes) -> bytes:
+        return results
+
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
         return len(self.entities), iter(self.entities)
 
@@ -126,6 +144,29 @@ class MemoryIndex(Index):
 
     async def get_documents(self) -> List[Document]:
         return self.documents
+
+    async def close(self) -> None:
+        pass
+
+
+class MspsiIndex(Index):
+    def __init__(self, repository: Repository, es_index: LuceneIndex):
+        self.es_index = es_index
+        self.repository = repository
+
+    async def process_search_results(self, results: bytes) -> bytes:
+        pass
+
+    async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
+        return await self.es_index.publish()
+
+    async def search(self, query: bytes) -> bytes:
+        kwds = unpackb(query)
+        publications = await self.repository.get_publications()
+        return packb(MSPSIDocumentOwner.reply(publications[0].secret, kwds))
+
+    async def get_documents(self) -> List[Document]:
+        return await self.es_index.get_documents()
 
     async def close(self) -> None:
         pass

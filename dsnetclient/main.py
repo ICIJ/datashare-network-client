@@ -10,10 +10,10 @@ from random import expovariate, getrandbits
 from typing import List, Optional
 
 import alembic.config
+from dsnet.core import QueryType
 from dsnet.mspsi import Document
 
 from dsnetclient.form_parser import bs_parser
-from dsnetclient.query_encoder import LuceneEncoder, MSPSIEncoder, SearchMode
 
 try:
     import readline
@@ -46,7 +46,7 @@ def asynccmd(f):
 
 class Demo(Cmd):
     def __init__(self, server_url: URL, token_url: URL, private_key: str, database_url, keys: List[str], index: Index,
-                 search_mode: SearchMode, message_retriever=None, message_sender=None,
+                 search_mode: QueryType, message_retriever=None, message_sender=None,
                  history_file: Path = None, history_file_size=1000):
         super().__init__()
         self.search_mode = search_mode
@@ -60,7 +60,7 @@ class Demo(Cmd):
             self.repository,
             message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
             message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
-            query_encoder=MSPSIEncoder() if search_mode == SearchMode.DPSI else LuceneEncoder(),
+            query_type=search_mode,
             secret_key=self.private_key,
             index=index
         )
@@ -272,9 +272,9 @@ def _migrate(database_url: str) -> None:
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
 @click.option('--history-size', help="Client's history size", required=False, default=1000)
-@click.option('--search-mode', help='The search mode for the client', type=click.Choice(list(map(lambda x: x.name, SearchMode))), required=False, default='Lucene', callback=lambda ctx, param, value: SearchMode[value])
+@click.option('--query-type', help='The query type (search mode) for the client', type=click.Choice(list(map(lambda x: x.name, QueryType))), required=False, default='Lucene', callback=lambda ctx, param, value: QueryType[value])
 def shell(server_url, token_server_url, private_key, database_url,
-          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size, search_mode: SearchMode):
+          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size, search_mode: QueryType):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 

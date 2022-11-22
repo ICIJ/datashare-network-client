@@ -8,6 +8,7 @@ from sscred.blind_signature import AbePublicKey, AbePrivateKey
 from sscred.pack import unpackb
 from yarl import URL
 from starlette.config import environ
+from dsnet.core import QueryType
 
 import tokenserver.main
 import tokenserver.test.server_oauth2
@@ -17,7 +18,6 @@ from dsnetclient.form_parser import bs_parser
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
-from dsnetclient.query_encoder import LuceneEncoder
 from dsnetclient.repository import SqlalchemyRepository
 from tokenserver.test.server import UvicornTestServer
 
@@ -63,7 +63,7 @@ async def test_fetch_token_not_authenticated(startup_and_shutdown_servers):
         repository,
         message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
         message_sender=DirectMessageSender(URL('http://notused')),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy",
     )
     with pytest.raises(InvalidAuthorizationResponse):
@@ -80,7 +80,7 @@ async def test_fetch_token_with_authentication_bad_login(startup_and_shutdown_se
         repository,
         message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
         message_sender=DirectMessageSender(URL('http://notused')),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy",
     )
     with pytest.raises(InvalidAuthorizationResponse):
@@ -98,7 +98,7 @@ async def test_auth_epoch_tokens_already_downloaded(startup_and_shutdown_servers
         repository,
         message_retriever=AddressMatchMessageRetriever(URL('http://notused'), repository),
         message_sender=DirectMessageSender(URL('http://notused')),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy",
     )
     assert 0 == await api.fetch_pre_tokens('johndoe', 'secret', bs_parser)
@@ -115,7 +115,7 @@ async def test_auth_get_tokens_with_form_parser_url_none(pkey, startup_and_shutd
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy"
     )
     assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: (None, {'username': 'johndoe', 'password': 'secret'}))
@@ -132,7 +132,7 @@ async def test_auth_get_tokens_with_form_parser_url_relative(pkey, startup_and_s
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy"
     )
     assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', lambda html, u, p: ('/signin', {'username': 'johndoe', 'password': 'secret'}))
@@ -149,7 +149,7 @@ async def test_auth_get_tokens(pkey, startup_and_shutdown_servers):
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=b"dummy"
     )
     assert 3 == await api.fetch_pre_tokens('johndoe', 'secret', bs_parser)

@@ -6,17 +6,18 @@ import dsnet
 import dsnetserver
 import pytest
 import pytest_asyncio
+from dsnet.core import QueryType
 from dsnet.message import MessageType, Message
 from dsnet.crypto import gen_key_pair
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
+from sscred import unpackb
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
-from dsnetclient.query_encoder import LuceneEncoder
 from dsnetclient.repository import SqlalchemyRepository, Peer
 from tokenserver.test.server import UvicornTestServer
 from test.test_utils import create_tokens
@@ -56,7 +57,7 @@ async def test_root(startup_and_shutdown_server):
             secret_key=b"dummy",
             message_retriever=AddressMatchMessageRetriever(url, None),
             message_sender=DirectMessageSender(url),
-            query_encoder=LuceneEncoder()
+            query_type=QueryType.CLEARTEXT
         ).get_server_version() == \
            {'message': f'Datashare Network Server version {dsnetserver.__version__}',
             'core_version': dsnet.__version__,
@@ -78,7 +79,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
     async def cb(message: Message) -> None:
         assert message is not None
         assert message.type() == MessageType.QUERY
-        assert message.payload == b'payload_value'
+        assert unpackb(message.payload) == [b'payload_value']
         cb_called.set()
 
     url = URL('http://localhost:12345')
@@ -89,7 +90,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder()
+        query_type=QueryType.CLEARTEXT
     )
     api.background_listening(cb)
     await api.send_query(b'payload_value')
@@ -112,7 +113,7 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder()
+        query_type=QueryType.CLEARTEXT
     )
     task = api.background_listening(dummy_cb)
     await api.close()
@@ -147,7 +148,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
         secret_key=keys.secret,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         reconnect_delay_seconds=0.1,
     )
     api.background_listening(cb)
@@ -185,7 +186,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
         secret_key=keys_alice.secret,
         message_retriever=retriever,
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder()
+        query_type=QueryType.CLEARTEXT
     )
     api_bob = DsnetApi(
         url,
@@ -194,7 +195,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
         secret_key=keys_bob.secret,
         message_retriever=retriever,
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder()
+        query_type=QueryType.CLEARTEXT
     )
 
     async def cb_alice(message: Message):

@@ -1,15 +1,16 @@
 import asyncio
+import datetime
 import uuid
 from asyncio import Task
 from typing import Awaitable, Callable, Tuple, List
 
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError, InvalidURL
-from dsnet.core import Conversation, Query
+from dsnet.core import Conversation, Query, QueryType
 from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
-from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage
-from dsnet.mspsi import MSPSIDocumentOwner
+from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage, PigeonHoleMessage
+from dsnet.mspsi import MSPSIDocumentOwner, MSPSIQuerier, Document
 from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
 from sscred import (
@@ -25,15 +26,11 @@ from dsnetclient.index import Index, MemoryIndex, NamedEntity, NamedEntityCatego
 from dsnetclient.message_retriever import MessageRetriever, AddressMatchMessageRetriever
 from dsnetclient.message_sender import MessageSender, DirectMessageSender
 from dsnetclient.models import metadata
-from dsnetclient.query_encoder import QueryEncoder
 from dsnetclient.repository import Repository, SqlalchemyRepository, Publication
 
 
-class NoTokenException(Exception):
-    pass
-
-class InvalidAuthorizationResponse(Exception):
-    pass
+class NoTokenException(Exception): pass
+class InvalidAuthorizationResponse(Exception): pass
 
 
 class DsnetApi:
@@ -45,7 +42,7 @@ class DsnetApi:
             secret_key: bytes,
             message_retriever: MessageRetriever,
             message_sender: MessageSender,
-            query_encoder: QueryEncoder,
+            query_type: QueryType,
             reconnect_delay_seconds=2,
             index: Index = None,
     ) -> None:
@@ -59,7 +56,7 @@ class DsnetApi:
         self.ws = None
         self.message_retriever = message_retriever
         self.message_sender = message_sender
-        self.query_encoder = query_encoder
+        self.query_type = query_type
 
     async def get_server_version(self) -> dict:
         async with ClientSession() as session:
@@ -72,14 +69,16 @@ class DsnetApi:
         if abe_token is None:
             raise NoTokenException()
 
-        for peer in await self.repository.peers():
-            conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query)
+        peers = await self.repository.peers()
+        for idx, peer in enumerate(peers):
+            mspsi_key = None if self.query_type == QueryType.CLEARTEXT else MSPSIQuerier.gen_key()
+            conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query, query_mspsi_secret=mspsi_key)
             await self.repository.save_conversation(conv)
-
-        payload = Query.create(query_keys.public, abe_token, query).to_bytes()
-        async with ClientSession() as session:
-            async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
-                response.raise_for_status()
+            if idx == len(peers) - 1:
+                query_msg = conv.create_query(abe_token)
+                async with ClientSession() as session:
+                    async with session.post(self.base_url.join(URL('/bb/broadcast')), data=query_msg.to_bytes()) as response:
+                        response.raise_for_status()
 
     async def send_response(self, public_key: bytes, response_data: bytes) -> None:
         conversation = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key)
@@ -145,7 +144,25 @@ class DsnetApi:
 
     async def handle_ph_notification(self, msg: PigeonHoleNotification) -> None:
         logger.debug(f"received ph notification for {msg.adr_hex}")
-        await self.message_retriever.retrieve(msg)
+        encoded_message_ph_tuple = await self.message_retriever.retrieve(msg)
+
+        if encoded_message_ph_tuple is not None:
+            encoded_message, ph = encoded_message_ph_tuple
+
+            message = PigeonHoleMessage.from_bytes(encoded_message)
+            message.from_key = ph.key_for_hash
+
+            conversation = await self.repository.get_conversation_by_address(ph.address)
+            if message.type() == MessageType.RESPONSE:
+                payload = ph.decrypt(message.payload)
+                results = await self.index.process_search_results(payload)
+                conversation.add_results(results, ph)
+            else:
+                conversation.add_message(message)
+
+            await self.repository.save_conversation(conversation)
+        else:
+            logger.debug("no message retrieved, ignoring")
 
     async def handle_query(self, msg: Query) -> None:
         logger.info(f"received query {msg.public_key.hex()}")
@@ -222,7 +239,7 @@ class DsnetApi:
             async with session.post(self.base_url.join(URL('/bb/broadcast')), data=payload) as response:
                 response.raise_for_status()
 
-        await self.repository.save_publication(Publication(key_pair.secret, nym, len(documents)))
+        await self.repository.save_publication(Publication(key_pair.secret, secret, nym, len(documents)))
 
     async def get_or_create_nym(self):
         nym = await self.repository.get_parameter("nym")
@@ -249,7 +266,8 @@ def main():
         index=MemoryIndex([
             NamedEntity("doc_id", NamedEntityCategory.PERSON, "foo"),
             NamedEntity("doc_id", NamedEntityCategory.PERSON, "bar"),
-        ]),
+        ], documents=[Document("doc_id", datetime.datetime.utcnow(), "content with foo bar")]),
+        query_type=QueryType.CLEARTEXT,
         message_retriever=AddressMatchMessageRetriever(URL(dburl), repository),
         message_sender=DirectMessageSender(URL(dburl)),
     )

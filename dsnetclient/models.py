@@ -15,6 +15,7 @@ publication_table = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("secret_key", LargeBinary, unique=False, nullable=False),
+    Column("secret", LargeBinary, unique=False, nullable=False),
     Column("nym", String(16), index=True, nullable=False),
     Column("nb_docs", Integer, nullable=False),
     Column("created_at", DateTime, index=True, nullable=False),

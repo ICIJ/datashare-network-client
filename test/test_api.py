@@ -4,6 +4,7 @@ import re
 import databases
 import pytest
 import pytest_asyncio
+from dsnet.core import QueryType
 from dsnet.crypto import gen_key_pair
 from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage
 from pytest_httpserver import HTTPServer
@@ -17,7 +18,6 @@ from dsnetclient.index import MemoryIndex, NamedEntity, NamedEntityCategory, Doc
 from dsnetclient.message_retriever import AddressMatchMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata
-from dsnetclient.query_encoder import LuceneEncoder
 from dsnetclient.repository import SqlalchemyRepository, Peer
 from test.test_utils import create_tokens
 
@@ -221,7 +221,7 @@ async def create_api(httpserver, index=None, number_tokens=3):
         repository,
         message_retriever=AddressMatchMessageRetriever(url, repository),
         message_sender=DirectMessageSender(url),
-        query_encoder=LuceneEncoder(),
+        query_type=QueryType.CLEARTEXT,
         secret_key=my_keys.secret,
         index=index
     )
