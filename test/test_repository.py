@@ -6,6 +6,8 @@ import pytest_asyncio
 from dsnet.core import PigeonHole, Conversation
 from dsnet.crypto import gen_key_pair
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
+from dsnet.mspsi import MSPSIQuerier
+from petlib.bn import Bn
 from sqlalchemy import create_engine
 from sscred import AbeParam
 
@@ -316,11 +318,13 @@ async def test_set_get_parameter_no_value(connect_disconnect_db):
 @pytest.mark.asyncio
 async def test_save_and_get_publication(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
-    await repository.save_publication(Publication(b"secret", "nym", 4))
+    secret = MSPSIQuerier.gen_key()
+    await repository.save_publication(Publication(b"secret", secret, "nym", 4))
     publications = await repository.get_publications()
 
     assert len(publications) == 1
     assert publications[0].nym == "nym"
+    assert publications[0].secret == secret
     assert publications[0].secret_key == b"secret"
     assert publications[0].created_at is not None
 

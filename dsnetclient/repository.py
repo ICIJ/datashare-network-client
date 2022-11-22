@@ -12,6 +12,7 @@ from dsnet.core import Conversation, PigeonHole
 from dsnet.logger import logger
 from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
 from dsnet.token import AbeToken
+from petlib.bn import Bn
 from sqlalchemy import insert, select, column, delete, desc
 from sqlalchemy.sql import Select
 from sscred import packb, unpackb, AbePublicKey
@@ -28,12 +29,13 @@ class Peer:
 
 
 class Publication:
-    def __init__(self, secret_key: bytes, nym: str, nb_docs: int, created_at: Optional[datetime.datetime] = None, id = None):
+    def __init__(self, secret_key: bytes, secret: Bn, nym: str, nb_docs: int, created_at: Optional[datetime.datetime] = None, id = None):
+        self.secret = secret
+        self.secret_key = secret_key
         self.id = id
         self.created_at = created_at
         self.nb_docs = nb_docs
         self.nym = nym
-        self.secret_key = secret_key
 
 
 class Repository(metaclass=abc.ABCMeta):
@@ -442,11 +444,12 @@ class SqlalchemyRepository(Repository):
         return row['value'] if row is not None else None
 
     async def get_publications(self) -> List[Publication]:
-        return [Publication(**row) for row in await self.database.fetch_all(publication_table.select())]
+        return [Publication(row['secret_key'], Bn.from_binary(row['secret']), row['nym'], row['nb_docs'], row['created_at'], row['id']) for row in await self.database.fetch_all(publication_table.select().order_by(desc(publication_table.c.created_at)))]
 
     async def save_publication(self, publication: Publication) -> None:
         data = {
             "secret_key": publication.secret_key,
+            "secret": publication.secret.binary(),
             "nym": publication.nym,
             "nb_docs": publication.nb_docs,
             "created_at": datetime.datetime.utcnow()
