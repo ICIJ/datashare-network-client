@@ -139,6 +139,8 @@ class DsnetApi:
             await self.handle_ph_notification(message)
         elif message.type() == MessageType.QUERY:
             await self.handle_query(message)
+        elif message.type() == MessageType.PUBLICATION:
+            await self.handle_publication(message)
         else:
             logger.warning(f"received unhandled type {message.type()}")
 
@@ -172,6 +174,10 @@ class DsnetApi:
             await self.send_response(msg.public_key, results)
         else:
             logger.warning(f"invalid query's signature {msg.public_key.hex()}")
+
+    async def handle_publication(self, msg: PublicationMessage):
+        logger.info(f"received publication {msg.public_key.hex()}")
+        await self.repository.save_publication_message(msg)
 
     async def show_tokens(self) -> List[bytes]:
         return [packb(abe_token.token) for abe_token in await self.repository.get_tokens()]

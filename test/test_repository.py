@@ -3,10 +3,11 @@ from datetime import datetime
 import databases
 import pytest
 import pytest_asyncio
+from cuckoo.filter import BCuckooFilter
 from dsnet.core import PigeonHole, Conversation
 from dsnet.crypto import gen_key_pair
-from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
-from dsnet.mspsi import MSPSIQuerier
+from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage
+from dsnet.mspsi import MSPSIQuerier, CUCKOO_FILTER_ERROR_RATE, CUCKOO_FILTER_BUCKET_SIZE, CUCKOO_FILTER_MAX_KICKS
 from petlib.bn import Bn
 from sqlalchemy import create_engine
 from sscred import AbeParam
@@ -328,4 +329,22 @@ async def test_save_and_get_publication(connect_disconnect_db):
     assert publications[0].secret_key == b"secret"
     assert publications[0].created_at is not None
 
+@pytest.mark.asyncio
+async def test_save_and_get_publication_message(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    cuckoo = BCuckooFilter(
+        capacity=1000,
+        error_rate=CUCKOO_FILTER_ERROR_RATE,
+        bucket_size=CUCKOO_FILTER_BUCKET_SIZE,
+        max_kicks=CUCKOO_FILTER_MAX_KICKS
+    )
 
+    await repository.save_publication_message(PublicationMessage('nym', b'public_key', cuckoo, 1))
+    publications = await repository.get_publication_messages()
+    assert len(publications) == 1
+    assert publications[0].nym == "nym"
+    assert publications[0].public_key == b"public_key"
+    assert publications[0].cuckoo_filter.fingerprint_size == cuckoo.fingerprint_size
+
+    assert len(await repository.get_publication_message(b'public_key')) == 1
+    assert len(await repository.get_publication_message(b'bad_key')) == 0

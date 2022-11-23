@@ -21,6 +21,17 @@ publication_table = Table(
     Column("created_at", DateTime, index=True, nullable=False),
 )
 
+publication_message_table = Table(
+    "publication_message",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("public_key", LargeBinary, unique=False, nullable=False),
+    Column("cuckoo_filter", LargeBinary, index=True, nullable=False),
+    Column("nym", String(16), index=True, nullable=False),
+    Column("nb_docs", Integer, nullable=False),
+    Column("created_at", DateTime, index=True, nullable=False),
+)
+
 peer_table = Table(
     "peer",
     metadata,

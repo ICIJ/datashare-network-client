@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from databases import Database
 from dsnet.core import Conversation, PigeonHole
 from dsnet.logger import logger
-from dsnet.message import PigeonHoleMessage, PigeonHoleNotification
+from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage
 from dsnet.token import AbeToken
 from petlib.bn import Bn
 from sqlalchemy import insert, select, column, delete, desc
@@ -19,7 +19,7 @@ from sscred import packb, unpackb, AbePublicKey
 from sqlalchemy.sql.expression import func
 
 from dsnetclient.models import pigeonhole_table, conversation_table, message_table, peer_table, serverkey_table, \
-    token_table, parameter_table, publication_table
+    token_table, parameter_table, publication_table, publication_message_table
 
 
 class Peer:
@@ -219,11 +219,30 @@ class Repository(metaclass=abc.ABCMeta):
         :param publication: the publication to save
         """
 
+    @abc.abstractmethod
+    async def get_publication_messages(self) -> List[PublicationMessage]:
+        """
+        :return: the list of all received publication messages order by date
+        """
+
+    @abc.abstractmethod
+    async def get_publication_message(self, public_key) -> List[PublicationMessage]:
+        """
+        :return: publication messages by its public key
+        """
+
+    @abc.abstractmethod
+    async def save_publication_message(self, publication_message: PublicationMessage) -> None:
+        """
+        save a publication message in database
+        """
+
+
+
 
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
-
     async def get_last_message_timestamp(self) -> Optional[datetime.datetime]:
         stmt = select(func.max(message_table.c.timestamp)).select_from(message_table)
         record_or_none = await self.database.fetch_one(stmt)
@@ -240,7 +259,7 @@ class SqlalchemyRepository(Repository):
 
     async def get_pigeonholes(self) -> List[PigeonHole]:
         return [SqlalchemyRepository._pigeonhole_from_row(row)
-             for row in await self.database.fetch_all(pigeonhole_table.select())]
+                for row in await self.database.fetch_all(pigeonhole_table.select())]
 
     async def get_conversation(self, id: int) -> Optional[Conversation]:
         stmt = self._create_conversation_statement().where(conversation_table.c.id == id)
@@ -268,7 +287,7 @@ class SqlalchemyRepository(Repository):
                 key_for_hash=pigeonhole.key_for_hash,
                 message_number=pigeonhole.message_number,
                 conversation_id=conversation_id
-                )
+            )
             )
         except sqlite3.IntegrityError:
             logger.debug("Attempted to add an existing pigeonhole")
@@ -456,3 +475,27 @@ class SqlalchemyRepository(Repository):
         }
         stmt = insert(publication_table).values(data)
         return await self.database.execute(stmt)
+
+    async def get_publication_message(self, public_key: bytes) -> List[PublicationMessage]:
+        stmt = publication_message_table.select().where(publication_message_table.c.public_key == public_key).\
+            order_by(desc(publication_message_table.c.created_at))
+        return [create_publication_message(row) for row in await self.database.fetch_all(stmt)]
+
+    async def get_publication_messages(self) -> List[PublicationMessage]:
+        stmt = publication_message_table.select().order_by(desc(publication_message_table.c.created_at))
+        return [create_publication_message(row) for row in await self.database.fetch_all(stmt)]
+
+    async def save_publication_message(self, publication_message: PublicationMessage) -> None:
+        data = {
+            "public_key": publication_message.public_key,
+            "cuckoo_filter": packb(publication_message.cuckoo_filter),
+            "nym": publication_message.nym,
+            "nb_docs": publication_message.num_documents,
+            "created_at": datetime.datetime.utcnow()
+        }
+        stmt = insert(publication_message_table).values(data)
+        return await self.database.execute(stmt)
+
+
+def create_publication_message(row):
+    return PublicationMessage(row['nym'], row['public_key'], unpackb(row['cuckoo_filter']), row['nb_docs'])

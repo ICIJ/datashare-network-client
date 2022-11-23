@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 2f964fbd9031
+Revision ID: 3704c5964cf2
 Revises: 
-Create Date: 2022-11-22 17:10:08.147395
+Create Date: 2022-11-23 20:14:07.456440
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '2f964fbd9031'
+revision = '3704c5964cf2'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -52,6 +52,18 @@ def upgrade():
     )
     op.create_index(op.f('ix_publication_created_at'), 'publication', ['created_at'], unique=False)
     op.create_index(op.f('ix_publication_nym'), 'publication', ['nym'], unique=False)
+    op.create_table('publication_message',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('public_key', sa.LargeBinary(), nullable=False),
+    sa.Column('cuckoo_filter', sa.LargeBinary(), nullable=False),
+    sa.Column('nym', sa.String(length=16), nullable=False),
+    sa.Column('nb_docs', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_publication_message_created_at'), 'publication_message', ['created_at'], unique=False)
+    op.create_index(op.f('ix_publication_message_cuckoo_filter'), 'publication_message', ['cuckoo_filter'], unique=False)
+    op.create_index(op.f('ix_publication_message_nym'), 'publication_message', ['nym'], unique=False)
     op.create_table('server_key',
     sa.Column('master_key', sa.LargeBinary(), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
@@ -96,6 +108,10 @@ def downgrade():
     op.drop_table('message')
     op.drop_table('token')
     op.drop_table('server_key')
+    op.drop_index(op.f('ix_publication_message_nym'), table_name='publication_message')
+    op.drop_index(op.f('ix_publication_message_cuckoo_filter'), table_name='publication_message')
+    op.drop_index(op.f('ix_publication_message_created_at'), table_name='publication_message')
+    op.drop_table('publication_message')
     op.drop_index(op.f('ix_publication_nym'), table_name='publication')
     op.drop_index(op.f('ix_publication_created_at'), table_name='publication')
     op.drop_table('publication')

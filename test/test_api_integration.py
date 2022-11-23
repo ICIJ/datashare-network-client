@@ -1,5 +1,7 @@
 import asyncio
+import datetime
 from asyncio import Event
+from unittest.mock import AsyncMock
 
 import databases
 import dsnet
@@ -7,19 +9,21 @@ import dsnetserver
 import pytest
 import pytest_asyncio
 from dsnet.core import QueryType
-from dsnet.message import MessageType, Message
 from dsnet.crypto import gen_key_pair
+from dsnet.message import MessageType, Message
+from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
 from sscred import unpackb
+from tokenserver.test.server import UvicornTestServer
 from yarl import URL
 
 from dsnetclient.api import DsnetApi
+from dsnetclient.index import Index
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository, Peer
-from tokenserver.test.server import UvicornTestServer
 from test.test_utils import create_tokens
 
 DATABASE_URL = 'sqlite:///dsnet.db'
@@ -97,6 +101,39 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 
     await cb_called.wait()
     await api.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(5)
+async def test_send_publication(startup_and_shutdown_server, connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    tokens, pk = create_tokens(1)
+    await repository.save_tokens(tokens)
+    await repository.save_token_server_key(pk)
+    keys = gen_key_pair()
+    await repository.save_peer(Peer(keys.public))
+
+    index = AsyncMock(Index, side_effect=[[Document('doc_id', datetime.datetime.utcnow())], ])
+    index.get_documents = AsyncMock(return_value=[Document('doc_id', datetime.datetime.utcnow())])
+    index.publish = AsyncMock(return_value=(1, (ne for ne in [NamedEntity('doc_id', NamedEntityCategory.PERSON, 'foo')])))
+
+    url = URL('http://localhost:12345')
+    api = DsnetApi(
+        url,
+        None,
+        repository,
+        secret_key=keys.secret,
+        message_retriever=AddressMatchMessageRetriever(url, repository),
+        message_sender=DirectMessageSender(url),
+        query_type=QueryType.CLEARTEXT,
+        index=index
+    )
+    task = api.background_listening()
+    await api.send_publication()
+    await api.close()
+    await task
+    assert len(await repository.get_publications()) == 1
+    assert len(await repository.get_publication_messages()) == 1
 
 
 @pytest.mark.asyncio
