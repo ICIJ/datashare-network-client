@@ -183,9 +183,18 @@ class Demo(Cmd):
         send a message to a conversation identified with its id
         :param conversation_id
         """
-        print(line)
         conv_id, message = line.split(maxsplit=1)
         await self.api.send_message(int(conv_id), message.encode())
+        return False
+
+    @asynccmd
+    async def do_publication_messages(self, line: str) -> Optional[bool]:
+        """
+        list all received publication messages
+        """
+        publication_messages = await self.repository.get_publication_messages()
+        for pub_msg in publication_messages:
+            print(f'pkey: {pub_msg.public_key.hex()} number of docs: {pub_msg.num_documents}')
         return False
 
     @asynccmd
