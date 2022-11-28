@@ -272,9 +272,9 @@ def _migrate(database_url: str) -> None:
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--history-file', help="Client's history file", required=False, type=click.Path(), default=(Path.home()/".dsnet_history"))
 @click.option('--history-size', help="Client's history size", required=False, default=1000)
-@click.option('--query-type', help='The query type (search mode) for the client', type=click.Choice(list(map(lambda x: x.name, QueryType))), required=False, default='Lucene', callback=lambda ctx, param, value: QueryType[value])
+@click.option('--query-type', help='The query type (search mode) for the client', type=click.Choice(list(map(lambda x: x.name, QueryType))), required=False, default='CLEARTEXT', callback=lambda ctx, param, value: QueryType[value])
 def shell(server_url, token_server_url, private_key, database_url,
-          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size, search_mode: QueryType):
+          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, history_file, history_size, query_type: QueryType):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
@@ -308,7 +308,7 @@ def shell(server_url, token_server_url, private_key, database_url,
         database_url,
         keys_list,
         index,
-        search_mode,
+        query_type,
         history_file=history_file,
         history_file_size=history_size,
         message_retriever=message_retriever,
