@@ -7,7 +7,7 @@ name = "pypi"
 datashare-network-core = {editable = true, ref = "bc0988c2c771006e6df74fe63038b80cd00b2312", git = "https://github.com/ICIJ/datashare-network-core.git"}
 aiohttp = "==3.8.1"
 click = "==8.0.4"
-aioconsole = "==0.4.1"
+aioconsole = "==0.5.1"
 elasticsearch = '==7.9.1'
 Authlib = "==1.0.0"
 httpx = '==0.23.0'

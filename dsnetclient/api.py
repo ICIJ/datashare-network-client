@@ -1,13 +1,13 @@
 import asyncio
 import datetime
 import uuid
-from asyncio import Task
-from typing import Awaitable, Callable, Tuple, List
+from asyncio import Task, AbstractEventLoop
+from typing import Awaitable, Callable, Tuple, List, Optional
 
 import databases
-from aiohttp import ClientSession, WSMsgType, ClientConnectorError, InvalidURL
+from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query, QueryType
-from dsnet.crypto import gen_key_pair, get_public_key
+from dsnet.crypto import gen_key_pair
 from dsnet.logger import logger
 from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage, PigeonHoleMessage
 from dsnet.mspsi import MSPSIDocumentOwner, MSPSIQuerier, Document
@@ -130,8 +130,10 @@ class DsnetApi:
                     raise e
 
     def background_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
-                             decoder: Callable[[bytes], Message] = MessageType.loads) -> Task:
-        return asyncio.get_event_loop().create_task(self.start_listening(notification_cb, decoder))
+                             decoder: Callable[[bytes], Message] = MessageType.loads,
+                             loop: Optional[AbstractEventLoop] = None) -> Task:
+        evt_loop = asyncio.get_event_loop() if loop is None else loop
+        return evt_loop.create_task(self.start_listening(notification_cb, decoder))
 
     async def websocket_callback(self, message: Message) -> None:
         logger.debug(f"received message type {message.type()}")
@@ -262,8 +264,8 @@ def main():
     engine = create_engine(dburl)
     metadata.create_all(engine)
     repository = SqlalchemyRepository(databases.Database(dburl))
-    url = URL('http://localhost:8000')
-    token_url = URL('http://localhost:8001')
+    url = URL('http://localhost:8001')
+    token_url = URL('http://localhost:8000')
     api = DsnetApi(
         url,
         token_url,
