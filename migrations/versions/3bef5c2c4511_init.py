@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 3704c5964cf2
+Revision ID: 3bef5c2c4511
 Revises: 
-Create Date: 2022-11-23 20:14:07.456440
+Create Date: 2022-11-29 15:55:42.085148
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3704c5964cf2'
+revision = '3bef5c2c4511'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -62,8 +62,8 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_publication_message_created_at'), 'publication_message', ['created_at'], unique=False)
-    op.create_index(op.f('ix_publication_message_cuckoo_filter'), 'publication_message', ['cuckoo_filter'], unique=False)
     op.create_index(op.f('ix_publication_message_nym'), 'publication_message', ['nym'], unique=False)
+    op.create_index(op.f('ix_publication_message_public_key'), 'publication_message', ['public_key'], unique=True)
     op.create_table('server_key',
     sa.Column('master_key', sa.LargeBinary(), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
@@ -108,8 +108,8 @@ def downgrade():
     op.drop_table('message')
     op.drop_table('token')
     op.drop_table('server_key')
+    op.drop_index(op.f('ix_publication_message_public_key'), table_name='publication_message')
     op.drop_index(op.f('ix_publication_message_nym'), table_name='publication_message')
-    op.drop_index(op.f('ix_publication_message_cuckoo_filter'), table_name='publication_message')
     op.drop_index(op.f('ix_publication_message_created_at'), table_name='publication_message')
     op.drop_table('publication_message')
     op.drop_index(op.f('ix_publication_nym'), table_name='publication')
