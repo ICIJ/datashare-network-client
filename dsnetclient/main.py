@@ -56,7 +56,7 @@ class Demo(AsynchronousCli):
             secret_key=self.private_key,
             index=index
         )
-        self._listener = self.api.background_listening(self.loop)
+        self._listener = self.api.background_listening(loop=self.loop)  
         add_stdout_handler(level=logging.DEBUG)
         sys.ps1 = f'ds@{self.public_key[0:4].hex()}> '
         for key_hex in keys:
