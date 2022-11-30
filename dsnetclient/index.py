@@ -14,10 +14,10 @@ class Index(metaclass=abc.ABCMeta):
     API for searching into local entities
     """
     @abc.abstractmethod
-    async def search(self, query: bytes) -> bytes:
+    async def search(self, packb_kwds: bytes) -> bytes:
         """
         search method from a simple query
-        :param query: string query packb encoded
+        :param packb_kwds: keywords to search packb encoded
         :return:
         """
 
@@ -28,7 +28,7 @@ class Index(metaclass=abc.ABCMeta):
     async def process_search_results(self, results: bytes) -> bytes:
         """
         search method from a simple query
-        :param results: encoded results
+        :param results: packb encoded results
         :return: payload to store in local state
         """
 
@@ -59,7 +59,7 @@ class LuceneIndex(Index):
         self.aes = aes
 
     async def process_search_results(self, results: bytes) -> bytes:
-        return results
+        return dumps(unpackb(results)).encode()
 
     async def get_documents(self) -> List[Document]:
         resp = await self.aes.search(index=self.index_name, body=self.query_documents_body())
@@ -75,9 +75,10 @@ class LuceneIndex(Index):
             hit["_source"]["mention"]
         ) for hit in resp["hits"]["hits"])
 
-    async def search(self, query: bytes) -> bytes:
+    async def search(self, kwds_packb: bytes) -> bytes:
+        query = b' '.join(unpackb(kwds_packb))
         resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string(query.decode()))
-        return dumps([hit["_source"]["mention"] for hit in resp["hits"]["hits"]]).encode()
+        return packb([hit["_source"]["mention"] for hit in resp["hits"]["hits"]])
 
     def query_body_from_string(self, query: str) -> dict:
         return {

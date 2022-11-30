@@ -8,6 +8,9 @@ import pytest
 import pytest_asyncio
 from elasticsearch import AsyncElasticsearch, JSONSerializer
 from elasticsearch.exceptions import RequestError
+from msgpack import unpackb
+from sscred import packb
+
 from dsnetclient.index import LuceneIndex, Index, NamedEntityCategory, NamedEntity, Document
 
 lucene: Index
@@ -35,15 +38,23 @@ async def lucene_index():
 
 @pytest.mark.asyncio
 async def test_search_no_result(lucene_index):
-    resp = json.loads(await lucene.search(b"donald AND dock"))
+    resp = unpackb(await lucene.search(packb([b"donald", b"AND", b"dock"])))
     assert len(resp) == 0
 
 
 @pytest.mark.asyncio
 async def test_search_one_result(lucene_index):
     await TestIndexer(lucene.aes).add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON).commit()
-    resp = json.loads(await lucene.search(b'donald duck'))
+    resp = unpackb(await lucene.search(packb([b'donald duck'])))
     assert len(resp) == 1
+
+
+@pytest.mark.asyncio
+async def test_process_one_result(lucene_index):
+    await TestIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
+    results = await lucene.search(packb([b'mickey mouse']))
+    json_response = await lucene.process_search_results(results)
+    assert len(json.loads(json_response)) == 1
 
 
 @pytest.mark.asyncio
@@ -106,10 +117,8 @@ class TestIndexer:
 
     async def commit(self) -> None:
         for doc in self.documents:
-            print(doc)
             await self.aes.index(self.index_name,  id=doc.identifier, body={"extractionDate": doc.creation_date, "type": doc.type, "join": {"name": "Document"}})
         for ne in self.named_entities:
-            print(ne)
             await self.aes.index(self.index_name,
                                  body={**ne.__dict__, "join": {"parent": ne.document_id, "name": "NamedEntity"}},
                                  params={"refresh": "true", "routing": ne.document_id})
