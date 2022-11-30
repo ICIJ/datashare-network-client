@@ -155,8 +155,9 @@ class DsnetApi:
 
             message = PigeonHoleMessage.from_bytes(encoded_message)
             message.from_key = ph.key_for_hash
+            logger.info(f"received message {MessageType(message.type()).__repr__()}")
 
-            conversation = await self.repository.get_conversation_by_address(ph.address)
+            conversation = await self.repository.get_conversation_by_address(message.address)
             if message.type() == MessageType.RESPONSE:
                 payload = ph.decrypt(message.payload)
                 results = await self.index.process_search_results(payload)
