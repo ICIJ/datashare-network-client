@@ -9,7 +9,7 @@ from pathlib import Path
 from random import expovariate, getrandbits
 from typing import List
 
-import alembic.config
+import alembic
 from aioconsole import AsynchronousCli, ainput
 from dsnet.core import QueryType
 from dsnet.mspsi import Document
@@ -20,7 +20,7 @@ import click
 import databases
 import dsnet
 from dsnet.crypto import get_public_key, gen_key_pair
-from dsnet.logger import add_stdout_handler
+from dsnet.logger import add_stdout_handler, logger
 from elasticsearch import AsyncElasticsearch
 from yarl import URL
 
@@ -263,8 +263,6 @@ def shell(server_url, token_server_url, private_key, database_url,
         message_retriever = ProbabilisticCoverMessageRetriever(
             URL(server_url), SqlalchemyRepository(database_url), lambda: bool(getrandbits(1))
         )
-
-    _migrate(database_url)
 
     demo = Demo(
         URL(server_url),
