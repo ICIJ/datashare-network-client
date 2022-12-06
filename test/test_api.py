@@ -4,9 +4,10 @@ import re
 import databases
 import pytest
 import pytest_asyncio
+from cuckoo.filter import BCuckooFilter
 from dsnet.core import QueryType
 from dsnet.crypto import gen_key_pair
-from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage
+from dsnet.message import Query, PigeonHoleNotification, PigeonHoleMessage, PublicationMessage
 from pytest_httpserver import HTTPServer
 from pytest_httpserver.httpserver import HandlerType
 from sqlalchemy import create_engine
@@ -206,6 +207,25 @@ async def test_send_message(httpserver: HTTPServer, connect_disconnect_db):
     assert len(conversations) == 2
     assert conversations[0].nb_sent_messages == 2
     assert conversations[0].nb_recv_messages == 0
+
+
+@pytest.mark.asyncio
+async def test_get_broadcast_recovery_timestamp(httpserver: HTTPServer, connect_disconnect_db):
+    api = await create_api(httpserver)
+    ts = await api.broadcast_recovery_timestamp()
+    assert isinstance(ts, datetime.datetime)
+    assert ts < datetime.datetime.utcnow()
+
+
+@pytest.mark.asyncio
+async def test_get_broadcast_recovery_timestamp_from_last_message(httpserver: HTTPServer, connect_disconnect_db):
+    api = await create_api(httpserver)
+    await api.repository.save_publication_message(PublicationMessage('nym', b'public_key', BCuckooFilter(1, 0.1), 1))
+    expected_ts = await api.repository.get_last_broadcast_timestamp()
+
+    actual_ts = await api.broadcast_recovery_timestamp()
+
+    assert expected_ts == actual_ts
 
 
 async def create_api(httpserver, index=None, number_tokens=3):

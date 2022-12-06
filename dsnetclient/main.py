@@ -10,7 +10,8 @@ from random import expovariate, getrandbits
 from typing import List
 
 import alembic
-from aioconsole import AsynchronousCli, ainput
+from aioconsole import AsynchronousCli, ainput, compat
+from aioconsole.apython import load_readline
 from dsnet.core import QueryType
 from dsnet.mspsi import Document
 
