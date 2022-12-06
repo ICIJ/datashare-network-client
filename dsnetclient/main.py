@@ -27,26 +27,24 @@ from yarl import URL
 
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
-from dsnetclient.index import MemoryIndex, Index, LuceneIndex, NamedEntity, NamedEntityCategory
+from dsnetclient.index import MemoryIndex, Index, LuceneIndex, NamedEntity, NamedEntityCategory, MspsiIndex
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
-from dsnetclient.repository import SqlalchemyRepository, Peer
-
+from dsnetclient.repository import SqlalchemyRepository, Peer, Repository
 
 PARAM_EXTRACTOR = re.compile(r':param ([a-z_]+)')
 
 
 class Demo(AsynchronousCli):
-    def __init__(self, server_url: URL, token_url: URL, private_key: str, database_url, keys: List[str], index: Index,
+    def __init__(self, server_url: URL, token_url: URL, private_key: str, repository: Repository, keys: List[str], index: Index,
                  search_mode: QueryType, message_retriever=None, message_sender=None):
         super().__init__({method.replace('do_', ''): (getattr(self, method), get_arg_parser(self, method))
                           for method in dir(self) if method.startswith('do_')}, prog='datashare network')
         self.search_mode = search_mode
-        self.database = databases.Database(database_url)
         self.private_key = bytes.fromhex(private_key)
         self.public_key = get_public_key(self.private_key)
-        self.repository = SqlalchemyRepository(self.database)
+        self.repository = repository
         self.api = DsnetApi(
             server_url,
             token_url,
@@ -237,24 +235,20 @@ def extract_arg_from_docstring(docstring: str) -> List[str]:
 @click.option('--keys', prompt='Others\' key', help='Path to file containing keys (one key per line)')
 @click.option('--elasticsearch-url', cls=MutuallyExclusiveOption, help='Elasticsearch url ex: http://elasticsearch:9200',  mutually_exclusive=["entities_file"])
 @click.option('--elasticsearch-index', help='Elasticsearch index ex: local-datashare', default='local-datashare')
-@click.option('--entities-file', cls=MutuallyExclusiveOption, help='Entities files (one per line)',  mutually_exclusive=["elasticsearch_url"])
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
 @click.option('--query-type', help='The query type (search mode) for the client', type=click.Choice(list(map(lambda x: x.name, QueryType))), required=False, default='CLEARTEXT', callback=lambda ctx, param, value: QueryType[value])
 def shell(server_url, token_server_url, private_key, database_url,
-          elasticsearch_url, elasticsearch_index, keys, entities_file, cover, query_type: QueryType):
+          elasticsearch_url, elasticsearch_index, keys, cover, query_type: QueryType):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
     with open(keys, "r") as f:
         keys_list = f.readlines()
 
-    if elasticsearch_url is not None:
-        index = LuceneIndex(AsyncElasticsearch(elasticsearch_url), elasticsearch_index)
-    else:
-        with open(entities_file, "r") as f:
-            my_entities = f.readlines()
-        entities = [NamedEntity("doc_id", NamedEntityCategory.PERSON, e.strip('\n')) for e in my_entities]
-        index = MemoryIndex(entities, [Document("doc_id", datetime.datetime.utcnow())])
+    index = LuceneIndex(AsyncElasticsearch(elasticsearch_url), elasticsearch_index)
+    repository = SqlalchemyRepository(databases.Database(database_url))
+    if query_type == QueryType.DPSI:
+        index = MspsiIndex(repository, index)
 
     message_sender = None
     message_retriever = None
@@ -263,14 +257,14 @@ def shell(server_url, token_server_url, private_key, database_url,
             URL(server_url), lambda: expovariate(0.2)
         )
         message_retriever = ProbabilisticCoverMessageRetriever(
-            URL(server_url), SqlalchemyRepository(database_url), lambda: bool(getrandbits(1))
+            URL(server_url), repository, lambda: bool(getrandbits(1))
         )
 
     demo = Demo(
         URL(server_url),
         URL(token_server_url),
         private_key_content,
-        database_url,
+        repository,
         keys_list,
         index,
         query_type,
