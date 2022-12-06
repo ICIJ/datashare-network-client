@@ -3,6 +3,7 @@ from __future__ import  annotations
 import datetime
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -11,7 +12,7 @@ from elasticsearch.exceptions import RequestError
 from msgpack import unpackb
 from sscred import packb
 
-from dsnetclient.index import LuceneIndex, Index, NamedEntityCategory, NamedEntity, Document
+from dsnetclient.index import LuceneIndex, Index, NamedEntityCategory, NamedEntity, Document, MspsiIndex
 
 lucene: Index
 
@@ -44,14 +45,14 @@ async def test_search_no_result(lucene_index):
 
 @pytest.mark.asyncio
 async def test_search_one_result(lucene_index):
-    await TestIndexer(lucene.aes).add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON).commit()
+    await TestLuceneIndexer(lucene.aes).add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON).commit()
     resp = unpackb(await lucene.search(packb([b'donald duck'])))
     assert len(resp) == 1
 
 
 @pytest.mark.asyncio
 async def test_process_one_result(lucene_index):
-    await TestIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
+    await TestLuceneIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
     results = await lucene.search(packb([b'mickey mouse']))
     json_response = await lucene.process_search_results(results)
     assert len(json.loads(json_response)) == 1
@@ -59,7 +60,7 @@ async def test_process_one_result(lucene_index):
 
 @pytest.mark.asyncio
 async def test_search_publish(lucene_index):
-    indexer = TestIndexer(lucene.aes)
+    indexer = TestLuceneIndexer(lucene.aes)
     await (
         indexer
         .add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON)
@@ -78,8 +79,8 @@ async def test_search_publish(lucene_index):
 
 
 @pytest.mark.asyncio
-async def test_search_documents(lucene_index):
-    indexer = TestIndexer(lucene.aes)
+async def test_search_documents_lucene(lucene_index):
+    indexer = TestLuceneIndexer(lucene.aes)
     await (
         indexer
             .add_document("doc_id1", "donald duck", datetime.datetime.fromisoformat('2022-09-16T14:44:17.052'))
@@ -92,6 +93,13 @@ async def test_search_documents(lucene_index):
     assert len(documents) == 2
 
 
+@pytest.mark.asyncio
+async def test_search_documents_mspsi_no_publication(lucene_index):
+    repository = AsyncMock()
+    repository.get_publications = AsyncMock(return_value=None)
+    assert await MspsiIndex(repository, lucene_index).search(packb([b'kwd'])) is None
+
+
 class NamedEntityEncoder(JSONSerializer):
     def default(self, obj):
         if isinstance(obj, NamedEntityCategory):
@@ -100,18 +108,18 @@ class NamedEntityEncoder(JSONSerializer):
             super().default(obj)
 
 
-class TestIndexer:
+class TestLuceneIndexer:
     def __init__(self, aes: AsyncElasticsearch, index_name: str = "test-datashare"):
         self.aes = aes
         self.index_name = index_name
         self.named_entities = []
         self.documents = []
 
-    def add_named_entity(self, doc_id: str, mention: str, category: NamedEntityCategory) -> TestIndexer:
+    def add_named_entity(self, doc_id: str, mention: str, category: NamedEntityCategory) -> TestLuceneIndexer:
         self.named_entities.append(NamedEntity(doc_id, category, mention))
         return self
 
-    def add_document(self, doc_id: str, content: str, creation_date: datetime.datetime) -> TestIndexer:
+    def add_document(self, doc_id: str, content: str, creation_date: datetime.datetime) -> TestLuceneIndexer:
         self.documents.append(Document(doc_id, creation_date, content))
         return self
 

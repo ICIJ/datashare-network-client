@@ -1,6 +1,6 @@
 import abc
 from json import dumps
-from typing import List, Tuple, Iterator
+from typing import List, Tuple, Iterator, Optional
 
 from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory, MSPSIDocumentOwner
 from elasticsearch import AsyncElasticsearch
@@ -14,7 +14,7 @@ class Index(metaclass=abc.ABCMeta):
     API for searching into local entities
     """
     @abc.abstractmethod
-    async def search(self, packb_kwds: bytes) -> bytes:
+    async def search(self, packb_kwds: bytes) -> Optional[bytes]:
         """
         search method from a simple query
         :param packb_kwds: keywords to search packb encoded
@@ -161,10 +161,10 @@ class MspsiIndex(Index):
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
         return await self.es_index.publish()
 
-    async def search(self, query: bytes) -> bytes:
+    async def search(self, query: bytes) -> Optional[bytes]:
         kwds = unpackb(query)
         publications = await self.repository.get_publications()
-        return packb(MSPSIDocumentOwner.reply(publications[0].secret, kwds))
+        return packb(MSPSIDocumentOwner.reply(publications[0].secret, kwds)) if publications else None
 
     async def get_documents(self) -> List[Document]:
         return await self.es_index.get_documents()

@@ -177,7 +177,8 @@ class DsnetApi:
         server_key: AbePublicKey = await self.repository.get_token_server_key()
         if msg.validate(server_key):
             results = await self.index.search(msg.payload)
-            await self.send_response(msg.public_key, results)
+            if results is not None:
+                await self.send_response(msg.public_key, results)
         else:
             logger.warning(f"invalid query's signature {msg.public_key.hex()}")
 
