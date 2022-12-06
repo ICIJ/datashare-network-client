@@ -241,14 +241,14 @@ async def test_save_conversation_deletes_old_pigeonholes(connect_disconnect_db):
     querier_side = Conversation.create_from_querier(query_keys.secret, carol_keys.public, query=b'Hello')
     await repository.save_conversation(querier_side)
 
-    ts = await repository.get_last_message_timestamp()
+    ts = await repository.get_last_broadcast_timestamp()
     assert ts >= now
 
     querier_side = (await repository.get_conversations())[0]
     querier_side.add_message(carol_side.create_response(b"Hi"))
     await repository.save_conversation(querier_side)
 
-    assert ts != await repository.get_last_message_timestamp()
+    assert ts != await repository.get_last_broadcast_timestamp()
 
 
 @pytest.mark.asyncio
@@ -329,6 +329,7 @@ async def test_save_and_get_publication(connect_disconnect_db):
     assert publications[0].secret_key == b"secret"
     assert publications[0].created_at is not None
 
+
 @pytest.mark.asyncio
 async def test_save_and_get_publication_message(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
@@ -347,10 +348,11 @@ async def test_save_and_get_publication_message(connect_disconnect_db):
     assert publications[0].cuckoo_filter.fingerprint_size == cuckoo.fingerprint_size
 
     assert len(await repository.get_publication_message(b'public_key')) == 1
-    assert len(await repository.get_publication_message(b'bad_key')) == 0
+    assert await repository.get_last_broadcast_timestamp() is not None
+
 
 @pytest.mark.asyncio
-async def test_save_and_get_publication_message(connect_disconnect_db):
+async def test_save_and_get_publication_message_on_conflict_do_nothing(connect_disconnect_db):
     repository = SqlalchemyRepository(database)
     cuckoo = BCuckooFilter(
         capacity=1000,

@@ -101,7 +101,7 @@ class DsnetApi:
     async def start_listening(self, notification_cb: Callable[[Message], Awaitable[None]] = None,
                               decoder: Callable[[bytes], Message] = MessageType.loads):
         callback = self.websocket_callback if notification_cb is None else notification_cb
-        last_message_ts = await self.repository.get_last_message_timestamp()
+        last_message_ts = await self.repository.get_last_broadcast_timestamp()
         notification_url = '/notifications' if last_message_ts is None else f'/notifications?ts={last_message_ts.timestamp()}'
         url_ws = self.base_url.join(URL(notification_url))
         nb_errors = 0

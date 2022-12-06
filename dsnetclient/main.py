@@ -64,6 +64,7 @@ class Demo(AsynchronousCli):
             if private_key != self.public_key:
                 asyncio.get_event_loop().run_until_complete(self.repository.save_peer(Peer(key)))
 
+
     async def do_version(self, _reader, _writer) -> str:
         """
         display client/server version of datashare network
