@@ -1,4 +1,5 @@
-from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text, Boolean, String
+from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text, Boolean, String, \
+    UniqueConstraint
 
 # Database table definitions.
 metadata = MetaData()
@@ -25,11 +26,12 @@ publication_message_table = Table(
     "publication_message",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("public_key", LargeBinary, unique=True, index=True, nullable=False),
+    Column("public_key", LargeBinary, index=True, nullable=False),
     Column("cuckoo_filter", LargeBinary, index=False, nullable=False),
     Column("nym", String(16), index=True, nullable=False),
     Column("nb_docs", Integer, nullable=False),
     Column("created_at", DateTime, index=True, nullable=False),
+    UniqueConstraint("public_key", sqlite_on_conflict="IGNORE")
 )
 
 peer_table = Table(

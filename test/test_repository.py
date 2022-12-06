@@ -348,3 +348,16 @@ async def test_save_and_get_publication_message(connect_disconnect_db):
 
     assert len(await repository.get_publication_message(b'public_key')) == 1
     assert len(await repository.get_publication_message(b'bad_key')) == 0
+
+@pytest.mark.asyncio
+async def test_save_and_get_publication_message(connect_disconnect_db):
+    repository = SqlalchemyRepository(database)
+    cuckoo = BCuckooFilter(
+        capacity=1000,
+        error_rate=CUCKOO_FILTER_ERROR_RATE,
+        bucket_size=CUCKOO_FILTER_BUCKET_SIZE,
+        max_kicks=CUCKOO_FILTER_MAX_KICKS
+    )
+
+    await repository.save_publication_message(PublicationMessage('nym', b'public_key', cuckoo, 1))
+    await repository.save_publication_message(PublicationMessage('nym', b'public_key', cuckoo, 1))

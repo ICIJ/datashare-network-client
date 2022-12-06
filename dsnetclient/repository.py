@@ -238,11 +238,10 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
 
-
-
 class SqlalchemyRepository(Repository):
     def __init__(self, database: Database):
         self.database = database
+
     async def get_last_message_timestamp(self) -> Optional[datetime.datetime]:
         stmt = select(func.max(message_table.c.timestamp)).select_from(message_table)
         record_or_none = await self.database.fetch_one(stmt)

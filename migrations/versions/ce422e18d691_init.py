@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 3bef5c2c4511
+Revision ID: ce422e18d691
 Revises: 
-Create Date: 2022-11-29 15:55:42.085148
+Create Date: 2022-12-06 13:09:06.123534
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3bef5c2c4511'
+revision = 'ce422e18d691'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -59,11 +59,12 @@ def upgrade():
     sa.Column('nym', sa.String(length=16), nullable=False),
     sa.Column('nb_docs', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('public_key', sqlite_on_conflict="IGNORE")
     )
     op.create_index(op.f('ix_publication_message_created_at'), 'publication_message', ['created_at'], unique=False)
     op.create_index(op.f('ix_publication_message_nym'), 'publication_message', ['nym'], unique=False)
-    op.create_index(op.f('ix_publication_message_public_key'), 'publication_message', ['public_key'], unique=True)
+    op.create_index(op.f('ix_publication_message_public_key'), 'publication_message', ['public_key'], unique=False)
     op.create_table('server_key',
     sa.Column('master_key', sa.LargeBinary(), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
