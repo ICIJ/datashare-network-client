@@ -315,7 +315,8 @@ class SqlalchemyRepository(Repository):
                         other_public_key=conversation.other_public_key,
                         querier=conversation.querier,
                         created_at=conversation.created_at,
-                        query=conversation.query
+                        query=conversation.query,
+                        query_mspsi_secret=None if conversation.query_mspsi_secret is None else conversation.query_mspsi_secret.binary()
                     )
                 )
             else:
@@ -385,7 +386,8 @@ class SqlalchemyRepository(Repository):
                 row['querier'],
                 row['created_at'],
                 row['query'],
-                id=row['id']
+                id=row['id'],
+                query_mspsi_secret=None if row['query_mspsi_secret'] is None else Bn.from_binary(row['query_mspsi_secret'])
             )
             if row['dh_key']:
                 ph_dict[row['id']][row['address']] = PigeonHole(
@@ -410,7 +412,8 @@ class SqlalchemyRepository(Repository):
                 c.query,
                 pigeonholes=list(ph_dict[id].values()),
                 messages=list(sorted(messages_dict[id].values(), key=attrgetter('timestamp'))),
-                id=c.id
+                id=c.id,
+                query_mspsi_secret=c.query_mspsi_secret
             )
             for id, c in conversations.items()
         ]

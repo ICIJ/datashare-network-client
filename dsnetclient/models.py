@@ -47,6 +47,7 @@ conversation_table = Table(
     Column("id", Integer, primary_key=True),
     Column("secret_key", LargeBinary, nullable=False),
     Column("public_key", LargeBinary, index=True, nullable=False),
+    Column("query_mspsi_secret", LargeBinary, nullable=True),
     Column("other_public_key", LargeBinary, index=True, nullable=False),
     Column('querier', Boolean, nullable=False, default=False),
     Column('query', LargeBinary, nullable=True),

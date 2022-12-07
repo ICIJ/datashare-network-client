@@ -363,3 +363,17 @@ async def test_save_and_get_publication_message_on_conflict_do_nothing(connect_d
 
     await repository.save_publication_message(PublicationMessage('nym', b'public_key', cuckoo, 1))
     await repository.save_publication_message(PublicationMessage('nym', b'public_key', cuckoo, 1))
+
+
+@pytest.mark.asyncio
+async def test_save_conversation_with_mspsi_secret(connect_disconnect_db):
+    query_keys = gen_key_pair()
+    bob_keys = gen_key_pair()
+    mspsi_key = Bn()
+    conversation = Conversation.create_from_querier(query_keys.secret, bob_keys.public, query=b'you cant readme', query_mspsi_secret=mspsi_key)
+
+    repository = SqlalchemyRepository(database)
+    await repository.save_conversation(conversation)
+    actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
+
+    assert actual_conversation.query_mspsi_secret == mspsi_key
