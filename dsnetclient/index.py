@@ -158,7 +158,12 @@ class MspsiIndex(Index):
         self.repository = repository
 
     async def process_search_results(self, raw_response: bytes, conversation: Conversation) -> bytes:
-        pass
+        kwds_enc: List[bytes] = unpackb(raw_response)
+        kwds_dec = MSPSIQuerier.decode_reply(conversation.query_mspsi_secret, kwds_enc)
+        publication_message = await self.repository.get_publication_message(conversation.other_public_key)
+        kwds_per_docs = MSPSIQuerier.process_reply(
+            kwds_dec, publication_message.num_documents, publication_message.cuckoo_filter)
+        return dumps(kwds_per_docs).encode()
 
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
         return await self.es_index.publish()
