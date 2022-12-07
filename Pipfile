@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-datashare-network-core = {editable = true, ref = "bc0988c2c771006e6df74fe63038b80cd00b2312", git = "https://github.com/ICIJ/datashare-network-core.git"}
+datashare-network-core = {editable = true, ref = "4ee919f78856004e3c300cfe99616e21c390a394", git = "https://github.com/ICIJ/datashare-network-core.git"}
 aiohttp = "==3.8.1"
 click = "==8.0.4"
 aioconsole = "==0.5.1"
