@@ -226,7 +226,7 @@ class Repository(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    async def get_publication_message(self, public_key) -> List[PublicationMessage]:
+    async def get_publication_message(self, public_key) -> PublicationMessage:
         """
         :return: publication messages by its public key
         """
@@ -489,10 +489,10 @@ class SqlalchemyRepository(Repository):
         stmt = insert(publication_table).values(data)
         return await self.database.execute(stmt)
 
-    async def get_publication_message(self, public_key: bytes) -> List[PublicationMessage]:
+    async def get_publication_message(self, public_key: bytes) -> PublicationMessage:
         stmt = publication_message_table.select().where(publication_message_table.c.public_key == public_key).\
             order_by(desc(publication_message_table.c.created_at))
-        return [create_publication_message(row) for row in await self.database.fetch_all(stmt)]
+        return create_publication_message(await self.database.fetch_one(stmt))
 
     async def get_publication_messages(self) -> List[PublicationMessage]:
         stmt = publication_message_table.select().order_by(desc(publication_message_table.c.created_at))

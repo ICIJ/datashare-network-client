@@ -347,7 +347,7 @@ async def test_save_and_get_publication_message(connect_disconnect_db):
     assert publications[0].public_key == b"public_key"
     assert publications[0].cuckoo_filter.fingerprint_size == cuckoo.fingerprint_size
 
-    assert len(await repository.get_publication_message(b'public_key')) == 1
+    assert await repository.get_publication_message(b'public_key') is not None
     assert await repository.get_last_broadcast_timestamp() is not None
 
 

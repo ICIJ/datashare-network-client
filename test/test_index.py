@@ -54,7 +54,7 @@ async def test_search_one_result(lucene_index):
 async def test_process_one_result(lucene_index):
     await TestLuceneIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
     results = await lucene.search(packb([b'mickey mouse']))
-    json_response = await lucene.process_search_results(results)
+    json_response = await lucene.process_search_results(results, None)
     assert len(json.loads(json_response)) == 1
 
 

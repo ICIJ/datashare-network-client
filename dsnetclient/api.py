@@ -163,7 +163,7 @@ class DsnetApi:
             conversation = await self.repository.get_conversation_by_address(message.address)
             if message.type() == MessageType.RESPONSE:
                 payload = ph.decrypt(message.payload)
-                results = await self.index.process_search_results(payload)
+                results = await self.index.process_search_results(payload, conversation)
                 conversation.add_results(results, ph)
             else:
                 conversation.add_message(message)

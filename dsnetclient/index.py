@@ -2,7 +2,8 @@ import abc
 from json import dumps
 from typing import List, Tuple, Iterator, Optional
 
-from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory, MSPSIDocumentOwner
+from dsnet.core import Conversation
+from dsnet.mspsi import Document, NamedEntity, NamedEntityCategory, MSPSIDocumentOwner, MSPSIQuerier
 from elasticsearch import AsyncElasticsearch
 from sscred import unpackb, packb
 
@@ -25,10 +26,11 @@ class Index(metaclass=abc.ABCMeta):
     processing search results when the query sender receives the document owner response
     """
     @abc.abstractmethod
-    async def process_search_results(self, results: bytes) -> bytes:
+    async def process_search_results(self, results: bytes, conversation: Conversation) -> bytes:
         """
         search method from a simple query
         :param results: packb encoded results
+        :param conversation: conversation related to the result
         :return: payload to store in local state
         """
 
@@ -58,7 +60,7 @@ class LuceneIndex(Index):
         self.index_name = index_name
         self.aes = aes
 
-    async def process_search_results(self, results: bytes) -> bytes:
+    async def process_search_results(self, results: bytes, _c: Conversation) -> bytes:
         return dumps(unpackb(results)).encode()
 
     async def get_documents(self) -> List[Document]:
@@ -132,7 +134,7 @@ class MemoryIndex(Index):
         self.entities = entities
         self.documents = documents
 
-    async def process_search_results(self, results: bytes) -> bytes:
+    async def process_search_results(self, results: bytes, _c: Conversation) -> bytes:
         return results
 
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
@@ -155,7 +157,7 @@ class MspsiIndex(Index):
         self.es_index = es_index
         self.repository = repository
 
-    async def process_search_results(self, results: bytes) -> bytes:
+    async def process_search_results(self, raw_response: bytes, conversation: Conversation) -> bytes:
         pass
 
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
