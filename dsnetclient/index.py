@@ -84,6 +84,7 @@ class LuceneIndex(Index):
 
     def query_body_from_string(self, query: str) -> dict:
         return {
+            "size": 10000,
             "query": {
                 "bool": {
                     "must": [
@@ -104,6 +105,7 @@ class LuceneIndex(Index):
 
     def query_documents_body(self) -> dict:
         return {
+            "size": 10000,
             "query": {
                 "bool": {
                     "must": [
@@ -122,7 +124,7 @@ class LuceneIndex(Index):
                         }
                     ]
                 }
-            }
+            },
         }
 
     async def close(self):

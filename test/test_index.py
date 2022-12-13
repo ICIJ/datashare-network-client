@@ -125,7 +125,7 @@ class TestLuceneIndexer:
 
     async def commit(self) -> None:
         for doc in self.documents:
-            await self.aes.index(self.index_name,  id=doc.identifier, body={"extractionDate": doc.creation_date, "type": doc.type, "join": {"name": "Document"}})
+            await self.aes.index(self.index_name,  id=doc.identifier, body={"extractionDate": doc.creation_date.isoformat()+'Z', "type": doc.type, "join": {"name": "Document"}})
         for ne in self.named_entities:
             await self.aes.index(self.index_name,
                                  body={**ne.__dict__, "join": {"parent": ne.document_id, "name": "NamedEntity"}},
