@@ -25,19 +25,22 @@ jobs:
 
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "Pipfile.lock" }}
+            - v1-dependencies-{{ checksum "poetry.lock" }}
 
       - run:
-          name: install dependencies
+          name: Install Poetry and project's dependencies
           command: |
-            pipenv install --dev
+            export TERM=xterm-256color
+            export COLUMNS=150
+            curl -sSL https://install.python-poetry.org | python3 -
+            poetry install --with dev
 
       - save_cache:
           paths:
             - ~/.local/share/virtualenvs
-          key: v1-dependencies-{{ checksum "Pipfile.lock" }}
+          key: v1-dependencies-{{ checksum "poetry.lock" }}
 
       - run:
           name: run tests
           command: |
-            pipenv run pytest
+            poetry run pytest
