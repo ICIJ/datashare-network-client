@@ -23,7 +23,7 @@ python = "^3.8"
 datashare-network-core = { git = "https://github.com/ICIJ/datashare-network-core.git", tag = "0.13.5" }
 aiohttp = "^3.8.3"
 aioconsole = "^0.5.1"
-elasticsearch = "^8.5.3"
+elasticsearch = "^7.9.1"
 Authlib = "^1.0.0"
 httpx = "^0.23.1"
 beautifulsoup4 = "^4.11.1"
@@ -39,10 +39,10 @@ pytest-asyncio = "^0.20.3"
 async-solipsism = "^0.5"
 pytest-timeout = "^2.1.0"
 python-multipart = "^0.0.5"
-uvicorn = {extras = ["standart"], version = "^0.20.0"}
+uvicorn = {extras = ["standard"], version = "^0.20.0"}
 pytest = "^7.2.0"
-datashare-network-server = {git = "https://github.com/ICIJ/datashare-network-server.git", tag = "0.7.6"}
-datashare-network-tokenserver = {git = "https://github.com/ICIJ/datashare-network-tokenserver.git", tag = "1.0.5"}
+datashare-network-server = {git = "https://github.com/ICIJ/datashare-network-server.git", tag = "0.7.7"}
+datashare-network-tokenserver = {git = "https://github.com/ICIJ/datashare-network-tokenserver.git", tag = "1.0.6"}
 
 [build-system]
 requires = ["poetry-core"]
