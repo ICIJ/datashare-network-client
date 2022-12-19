@@ -64,13 +64,15 @@ class LuceneIndex(Index):
         return dumps(unpackb(results)).encode()
 
     async def get_documents(self) -> List[Document]:
-        resp = await self.aes.search(index=self.index_name, body=self.query_documents_body())
+        body = self.query_documents_body()
+        resp = await self.aes.search(index=self.index_name, **body)
         return [
             Document(hit["_id"], hit["_source"]["extractionDate"]) for hit in resp["hits"]["hits"]
         ]
 
     async def publish(self) -> Tuple[int, Iterator[NamedEntity]]:
-        resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string("*"))
+        body = self.query_body_from_string("*")
+        resp = await self.aes.search(index=self.index_name, **body)
         return resp["hits"]["total"]["value"], (NamedEntity(
             hit["_routing"],
             NamedEntityCategory[hit["_source"]["category"]],
@@ -79,7 +81,8 @@ class LuceneIndex(Index):
 
     async def search(self, kwds_packb: bytes) -> bytes:
         query = b' '.join(unpackb(kwds_packb))
-        resp = await self.aes.search(index=self.index_name, body=self.query_body_from_string(query.decode()))
+        body = self.query_body_from_string(query.decode())
+        resp = await self.aes.search(index=self.index_name, **body)
         return packb([hit["_source"]["mention"] for hit in resp["hits"]["hits"]])
 
     def query_body_from_string(self, query: str) -> dict:

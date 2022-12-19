@@ -20,15 +20,14 @@ lucene: Index
 @pytest_asyncio.fixture
 async def lucene_index():
     global lucene
-    mappings = (Path(__file__).parent / "data" / "datashare_index_mappings.json").read_text()
-    settings = (Path(__file__).parent / "data" / "datashare_index_settings.json").read_text()
-    body = f'{{ "mappings": {mappings}, "settings": {settings} }}'
+    mappings = json.loads((Path(__file__).parent / "data" / "datashare_index_mappings.json").read_text())
+    settings = json.loads((Path(__file__).parent / "data" / "datashare_index_settings.json").read_text())
     elasticsearch = AsyncElasticsearch("http://elasticsearch:9200", serializer=NamedEntityEncoder())
     try:
-        await elasticsearch.indices.create(index="test-datashare", body=body)
+        await elasticsearch.indices.create(index="test-datashare", mappings=mappings, settings=settings)
     except RequestError:
         await elasticsearch.indices.delete(index="test-datashare")
-        await elasticsearch.indices.create(index="test-datashare", body=body)
+        await elasticsearch.indices.create(index="test-datashare", mappings=mappings, settings=settings)
     lucene = LuceneIndex(elasticsearch, index_name="test-datashare")
 
     yield
@@ -45,14 +44,14 @@ async def test_search_no_result(lucene_index):
 
 @pytest.mark.asyncio
 async def test_search_one_result(lucene_index):
-    await TestLuceneIndexer(lucene.aes).add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON).commit()
+    await HelperLuceneIndexer(lucene.aes).add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON).commit()
     resp = unpackb(await lucene.search(packb([b'donald duck'])))
     assert len(resp) == 1
 
 
 @pytest.mark.asyncio
 async def test_process_one_result(lucene_index):
-    await TestLuceneIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
+    await HelperLuceneIndexer(lucene.aes).add_named_entity("doc_id", "mickey mouse", NamedEntityCategory.PERSON).commit()
     results = await lucene.search(packb([b'mickey mouse']))
     json_response = await lucene.process_search_results(results, None)
     assert len(json.loads(json_response)) == 1
@@ -60,7 +59,7 @@ async def test_process_one_result(lucene_index):
 
 @pytest.mark.asyncio
 async def test_search_publish(lucene_index):
-    indexer = TestLuceneIndexer(lucene.aes)
+    indexer = HelperLuceneIndexer(lucene.aes)
     await (
         indexer
         .add_named_entity("doc_id", "donald duck", NamedEntityCategory.PERSON)
@@ -80,7 +79,7 @@ async def test_search_publish(lucene_index):
 
 @pytest.mark.asyncio
 async def test_search_documents_lucene(lucene_index):
-    indexer = TestLuceneIndexer(lucene.aes)
+    indexer = HelperLuceneIndexer(lucene.aes)
     await (
         indexer
             .add_document("doc_id1", "donald duck", datetime.datetime.fromisoformat('2022-09-16T14:44:17.052'))
@@ -108,25 +107,25 @@ class NamedEntityEncoder(JSONSerializer):
             super().default(obj)
 
 
-class TestLuceneIndexer:
+class HelperLuceneIndexer:
     def __init__(self, aes: AsyncElasticsearch, index_name: str = "test-datashare"):
         self.aes = aes
         self.index_name = index_name
         self.named_entities = []
         self.documents = []
 
-    def add_named_entity(self, doc_id: str, mention: str, category: NamedEntityCategory) -> TestLuceneIndexer:
+    def add_named_entity(self, doc_id: str, mention: str, category: NamedEntityCategory) -> HelperLuceneIndexer:
         self.named_entities.append(NamedEntity(doc_id, category, mention))
         return self
 
-    def add_document(self, doc_id: str, content: str, creation_date: datetime.datetime) -> TestLuceneIndexer:
+    def add_document(self, doc_id: str, content: str, creation_date: datetime.datetime) -> HelperLuceneIndexer:
         self.documents.append(Document(doc_id, creation_date, content))
         return self
 
     async def commit(self) -> None:
         for doc in self.documents:
-            await self.aes.index(self.index_name,  id=doc.identifier, body={"extractionDate": doc.creation_date.isoformat()+'Z', "type": doc.type, "join": {"name": "Document"}})
+            await self.aes.index(index=self.index_name,  id=doc.identifier, document={"extractionDate": doc.creation_date.isoformat()+'Z', "type": doc.type, "join": {"name": "Document"}})
         for ne in self.named_entities:
-            await self.aes.index(self.index_name,
-                                 body={**ne.__dict__, "join": {"parent": ne.document_id, "name": "NamedEntity"}},
+            await self.aes.index(index=self.index_name,
+                                 document={**ne.__dict__, "join": {"parent": ne.document_id, "name": "NamedEntity"}},
                                  params={"refresh": "true", "routing": ne.document_id})
