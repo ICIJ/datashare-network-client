@@ -47,3 +47,6 @@ datashare-network-tokenserver = {git = "https://github.com/ICIJ/datashare-networ
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+dsnetclient = { callable = "dsnetclient.main:cli" }
