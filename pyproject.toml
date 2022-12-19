@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "datashare-network-client"
+version = "0.4.0"
+description = "Client Datashare Network Library"
+authors = ["ICIJ <engineering@icij.org>"]
+license = "GNU Affero General Public License v3"
+readme = "README.md"
+packages = [{include = "dsnetclient"}]
+repository = "https://github.com/ICIJ/datashare-network-client"
+keywords=['datashare', 'api', 'network', 'cryptography']
+classifiers=[
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Topic :: Security :: Cryptography"
+]
+[tool.poetry.dependencies]
+python = "^3.8"
+datashare-network-core = { git = "https://github.com/ICIJ/datashare-network-core.git", tag = "0.13.5" }
+aiohttp = "^3.8.3"
+aioconsole = "^0.5.1"
+elasticsearch = "^8.5.3"
+Authlib = "^1.0.0"
+httpx = "^0.23.1"
+beautifulsoup4 = "^4.11.1"
+alembic = "^1.9.0"
+python-dateutil = "^2.8.2"
+click = "^8.1.3"
+databases = {extras = ["sqlite"], version = "^0.6.2"}
+
+
+[tool.poetry.group.dev.dependencies]
+pytest-httpserver = "^1.0.6"
+pytest-asyncio = "^0.20.3"
+async-solipsism = "^0.5"
+pytest-timeout = "^2.1.0"
+python-multipart = "^0.0.5"
+uvicorn = {extras = ["standart"], version = "^0.20.0"}
+pytest = "^7.2.0"
+datashare-network-server = {git = "https://github.com/ICIJ/datashare-network-server.git", tag = "0.7.6"}
+datashare-network-tokenserver = {git = "https://github.com/ICIJ/datashare-network-tokenserver.git", tag = "1.0.5"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
