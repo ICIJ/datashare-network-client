@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.8
       - image: redis:4.0.1-alpine
         name: redis
       - image: docker.elastic.co/elasticsearch/elasticsearch:7.9.1
