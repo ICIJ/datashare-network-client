@@ -26,18 +26,20 @@ from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository, Peer, Publication
 from test.test_utils import create_tokens
 
+
 DATABASE_URL = 'sqlite:///dsnet.db'
-database = databases.Database(DATABASE_URL)
+
 async def dummy_cb(_) -> None: pass
 
 
 @pytest_asyncio.fixture
 async def connect_disconnect_db():
+    database = databases.Database(DATABASE_URL)
     engine = create_engine(DATABASE_URL)
     metadata_client.create_all(engine)
     metadata_server.create_all(engine)
     await database.connect()
-    yield
+    yield database
     metadata_client.drop_all(engine)
     metadata_server.drop_all(engine)
     await database.disconnect()
@@ -71,7 +73,7 @@ async def test_root(startup_and_shutdown_server):
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(database)
+    repository = SqlalchemyRepository(connect_disconnect_db)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -106,7 +108,7 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_send_publication(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(database)
+    repository = SqlalchemyRepository(connect_disconnect_db)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -139,7 +141,7 @@ async def test_send_publication(startup_and_shutdown_server, connect_disconnect_
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(database)
+    repository = SqlalchemyRepository(connect_disconnect_db)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
     url = URL('http://localhost:12345')
@@ -161,7 +163,7 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_websocket_reconnect(connect_disconnect_db):
-    repository = SqlalchemyRepository(database)
+    repository = SqlalchemyRepository(connect_disconnect_db)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -203,7 +205,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_send_response(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(database)
+    repository = SqlalchemyRepository(connect_disconnect_db)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
