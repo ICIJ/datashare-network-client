@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import os
 from asyncio import Event
 from unittest.mock import AsyncMock
 
@@ -27,6 +28,7 @@ from dsnetclient.repository import SqlalchemyRepository, Peer, Publication
 from test.test_utils import create_tokens
 
 
+DATABASE_URL_SERVER = 'sqlite:///dsnet_server.db'
 DATABASE_URL = 'sqlite:///dsnet.db'
 
 async def dummy_cb(_) -> None: pass
@@ -37,20 +39,22 @@ async def connect_disconnect_db():
     database = databases.Database(DATABASE_URL)
     engine = create_engine(DATABASE_URL)
     metadata_client.create_all(engine)
-    metadata_server.create_all(engine)
     await database.connect()
     yield database
     metadata_client.drop_all(engine)
-    metadata_server.drop_all(engine)
     await database.disconnect()
 
 
 @pytest_asyncio.fixture
 async def startup_and_shutdown_server():
+    engine = create_engine(DATABASE_URL_SERVER)
+    os.environ['DS_DATABASE_URL'] = DATABASE_URL_SERVER
+    metadata_server.create_all(engine)
     server = UvicornTestServer('dsnetserver.main:app', port=12345)
     await server.up()
-    yield
+    yield server
     await server.down()
+    metadata_server.drop_all(engine)
 
 
 @pytest.mark.asyncio
@@ -162,13 +166,11 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_websocket_reconnect(connect_disconnect_db):
+async def test_websocket_reconnect(startup_and_shutdown_server, connect_disconnect_db):
     repository = SqlalchemyRepository(connect_disconnect_db)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
-    local_server = UvicornTestServer('dsnetserver.main:app', port=23456)
-    await local_server.up()
 
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
@@ -179,7 +181,7 @@ async def test_websocket_reconnect(connect_disconnect_db):
         assert payload is not None
         cb_called.set()
 
-    url = URL('http://localhost:23456')
+    url = URL('http://localhost:12345')
     api = DsnetApi(
         url,
         None,
@@ -192,14 +194,13 @@ async def test_websocket_reconnect(connect_disconnect_db):
     )
     api.background_listening(cb)
 
-    await local_server.down()
-    await local_server.up()
+    await startup_and_shutdown_server.down()
+    await startup_and_shutdown_server.up()
     await asyncio.sleep(0.2)
 
     await api.send_query(b'payload_value')
     await api.close()
     await cb_called.wait()
-    await local_server.down()
 
 
 @pytest.mark.asyncio
