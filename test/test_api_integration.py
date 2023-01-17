@@ -29,18 +29,35 @@ from test.test_utils import create_tokens
 
 
 DATABASE_URL_SERVER = 'sqlite:///dsnet_server.db'
-DATABASE_URL = 'sqlite:///dsnet.db'
+DATABASE_URL_ALICE = 'sqlite:///dsnet_alice.db'
+DATABASE_URL_BOB = 'sqlite:///dsnet_bob.db'
 
 async def dummy_cb(_) -> None: pass
 
 
 @pytest_asyncio.fixture
-async def connect_disconnect_db():
-    database = databases.Database(DATABASE_URL)
-    engine = create_engine(DATABASE_URL)
+async def db_alice():
+    engine, database = await init_db(DATABASE_URL_ALICE)
+    yield database
+    await close_db(engine, database)
+
+
+@pytest_asyncio.fixture
+async def db_bob():
+    engine, database = await init_db(DATABASE_URL_BOB)
+    yield database
+    await close_db(engine, database)
+
+
+async def init_db(url: str):
+    database = databases.Database(url)
+    engine = create_engine(url)
     metadata_client.create_all(engine)
     await database.connect()
-    yield database
+    return engine, database
+
+
+async def close_db(engine, database):
     metadata_client.drop_all(engine)
     await database.disconnect()
 
@@ -76,8 +93,8 @@ async def test_root(startup_and_shutdown_server):
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(connect_disconnect_db)
+async def test_send_query(startup_and_shutdown_server, db_alice):
+    repository = SqlalchemyRepository(db_alice)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -111,8 +128,8 @@ async def test_send_query(startup_and_shutdown_server, connect_disconnect_db):
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_send_publication(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(connect_disconnect_db)
+async def test_send_publication(startup_and_shutdown_server, db_alice):
+    repository = SqlalchemyRepository(db_alice)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -144,8 +161,8 @@ async def test_send_publication(startup_and_shutdown_server, connect_disconnect_
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(connect_disconnect_db)
+async def test_close_api(startup_and_shutdown_server, db_alice):
+    repository = SqlalchemyRepository(db_alice)
     keys = gen_key_pair()
     await repository.save_peer(Peer(keys.public))
     url = URL('http://localhost:12345')
@@ -166,8 +183,8 @@ async def test_close_api(startup_and_shutdown_server, connect_disconnect_db):
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_websocket_reconnect(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(connect_disconnect_db)
+async def test_websocket_reconnect(startup_and_shutdown_server, db_alice):
+    repository = SqlalchemyRepository(db_alice)
     tokens, pk = create_tokens(1)
     await repository.save_tokens(tokens)
     await repository.save_token_server_key(pk)
@@ -205,24 +222,25 @@ async def test_websocket_reconnect(startup_and_shutdown_server, connect_disconne
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
-async def test_send_response(startup_and_shutdown_server, connect_disconnect_db):
-    repository = SqlalchemyRepository(connect_disconnect_db)
+async def test_send_response(startup_and_shutdown_server, db_alice, db_bob):
+    repository_alice = SqlalchemyRepository(db_alice)
+    repository_bob = SqlalchemyRepository(db_bob)
     tokens, pk = create_tokens(1)
-    await repository.save_tokens(tokens)
-    await repository.save_token_server_key(pk)
+    await repository_alice.save_tokens(tokens)
+    await repository_alice.save_token_server_key(pk)
     keys_alice = gen_key_pair()
     keys_bob = gen_key_pair()
-    await repository.save_peer(Peer(keys_alice.public))
-    await repository.save_peer(Peer(keys_bob.public))
+    await repository_bob.save_peer(Peer(keys_alice.public))
+    await repository_alice.save_peer(Peer(keys_bob.public))
 
     url = URL('http://localhost:12345')
 
-    retriever = ProbabilisticCoverMessageRetriever(url, repository, lambda: False)
+    retriever = ProbabilisticCoverMessageRetriever(url, repository_bob, lambda: False)
 
     api_alice = DsnetApi(
         url,
         None,
-        repository,
+        repository_alice,
         secret_key=keys_alice.secret,
         message_retriever=retriever,
         message_sender=DirectMessageSender(url),
@@ -231,7 +249,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
     api_bob = DsnetApi(
         url,
         None,
-        repository,
+        repository_bob,
         secret_key=keys_bob.secret,
         message_retriever=retriever,
         message_sender=DirectMessageSender(url),
@@ -240,7 +258,7 @@ async def test_send_response(startup_and_shutdown_server, connect_disconnect_db)
 
     async def cb_alice(message: Message):
         if message.type() == MessageType.NOTIFICATION:
-            convs = await repository.get_conversations_filter_by(querier=True)
+            convs = await repository_alice.get_conversations_filter_by(querier=True)
             assert len(convs) == 1
             assert message.adr_hex == convs[0].last_address[0:3]
 
