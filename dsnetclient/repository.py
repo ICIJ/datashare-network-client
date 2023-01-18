@@ -8,9 +8,9 @@ from typing import List, Mapping, Optional
 from cryptography.hazmat.primitives._serialization import Encoding, PrivateFormat, NoEncryption
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from databases import Database
-from dsnet.core import Conversation, PigeonHole
+from dsnet.core import Conversation, PigeonHole, QueryType
 from dsnet.logger import logger
-from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage
+from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage, MessageType
 from dsnet.token import AbeToken
 from petlib.bn import Bn
 from sqlalchemy import insert, select, column, delete, desc
@@ -278,6 +278,7 @@ class SqlalchemyRepository(Repository):
     async def get_pigeonholes_by_adr(self, adr_hex: str) -> List[PigeonHole]:
         stmt = pigeonhole_table.select().where(pigeonhole_table.c.adr_hex == adr_hex)
         rows = await self.database.fetch_all(stmt)
+        logger.debug("")
         return [
             SqlalchemyRepository._pigeonhole_from_row(row)
             for row in rows
@@ -343,7 +344,8 @@ class SqlalchemyRepository(Repository):
                 from_key=message.from_key,
                 payload=message.payload,
                 timestamp=message.timestamp,
-                conversation_id=conversation_id
+                conversation_id=conversation_id,
+                type=message.type()
             )
             await self.database.execute(stmt)
         except sqlite3.IntegrityError:
@@ -387,6 +389,7 @@ class SqlalchemyRepository(Repository):
                 row['created_at'],
                 row['query'],
                 id=row['id'],
+                query_type=QueryType.CLEARTEXT if row['query_mspsi_secret'] is None else QueryType.DPSI,
                 query_mspsi_secret=None if row['query_mspsi_secret'] is None else Bn.from_binary(row['query_mspsi_secret'])
             )
             if row['dh_key']:
@@ -401,7 +404,8 @@ class SqlalchemyRepository(Repository):
                 payload=row['payload'],
                 from_key=row['from_key'],
                 timestamp=row['timestamp'],
-                conversation_id=row['id']
+                conversation_id=row['id'],
+                msg_type=MessageType(row['type'])
             )
         return [
             Conversation(
@@ -413,6 +417,7 @@ class SqlalchemyRepository(Repository):
                 pigeonholes=list(ph_dict[id].values()),
                 messages=list(sorted(messages_dict[id].values(), key=attrgetter('timestamp'))),
                 id=c.id,
+                query_type=c.query_type,
                 query_mspsi_secret=c.query_mspsi_secret
             )
             for id, c in conversations.items()

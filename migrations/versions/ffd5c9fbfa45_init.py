@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 916956fcbf4d
+Revision ID: ffd5c9fbfa45
 Revises: 
-Create Date: 2022-12-07 20:55:59.615828
+Create Date: 2023-01-18 08:59:56.550308
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '916956fcbf4d'
+revision = 'ffd5c9fbfa45'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -61,7 +61,7 @@ def upgrade():
     sa.Column('nb_docs', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('public_key', sqlite_on_conflict="IGNORE")
+    sa.UniqueConstraint('public_key')
     )
     op.create_index(op.f('ix_publication_message_created_at'), 'publication_message', ['created_at'], unique=False)
     op.create_index(op.f('ix_publication_message_nym'), 'publication_message', ['nym'], unique=False)
@@ -83,6 +83,7 @@ def upgrade():
     sa.Column('timestamp', sa.DateTime(), nullable=False),
     sa.Column('from_key', sa.LargeBinary(), nullable=False),
     sa.Column('payload', sa.LargeBinary(), nullable=True),
+    sa.Column('type', sa.SmallInteger(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversation.id'], ),
     sa.PrimaryKeyConstraint('id')

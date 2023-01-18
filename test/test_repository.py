@@ -4,9 +4,9 @@ import databases
 import pytest
 import pytest_asyncio
 from cuckoo.filter import BCuckooFilter
-from dsnet.core import PigeonHole, Conversation
+from dsnet.core import PigeonHole, Conversation, QueryType
 from dsnet.crypto import gen_key_pair
-from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage
+from dsnet.message import PigeonHoleMessage, PigeonHoleNotification, PublicationMessage, MessageType
 from dsnet.mspsi import MSPSIQuerier, CUCKOO_FILTER_ERROR_RATE, CUCKOO_FILTER_BUCKET_SIZE, CUCKOO_FILTER_MAX_KICKS
 from petlib.bn import Bn
 from sqlalchemy import create_engine
@@ -106,6 +106,7 @@ async def test_save_conversation(connect_disconnect_db):
     assert actual_conversation.query == conversation.query
     assert actual_conversation.is_receiving(conversation.last_address)
     assert actual_conversation.created_at == conversation.created_at
+    assert actual_conversation.last_message.type() == MessageType.QUERY
     assert await repository.get_pigeonhole(actual_conversation.last_address) is not None
 
 
@@ -116,21 +117,28 @@ async def test_save_conversation_with_messages(connect_disconnect_db):
     query_keys = gen_key_pair()
     alicia_keys = gen_key_pair()
     conversation = Conversation.create_from_querier(query_keys.secret, alicia_keys.public, query=b'Pop')
+    conversation.create_response(b'bob response')
     ph = conversation.pigeonhole_for_address(conversation.last_address)
-    encrypted_message1 = ph.encrypt(b'alicia response1')
+    encrypted_message1 = ph.encrypt(b'alicia message1')
     conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message1, alicia_keys.public, timestamp=datetime(2022, 2, 15, 14, 13, 12)))
     ph = conversation.pigeonhole_for_address(conversation.last_address)
-    encrypted_message2 = ph.encrypt(b'alicia response2')
+    encrypted_message2 = ph.encrypt(b'alicia message2')
     conversation.add_message(PigeonHoleMessage(conversation.last_address, encrypted_message2, alicia_keys.public, timestamp=datetime(2022, 2, 15, 14, 13, 14)))
 
     await repository.save_conversation(conversation)
 
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
     assert actual_conversation.nb_recv_messages == 2
-    assert actual_conversation.nb_sent_messages == 1
-    assert actual_conversation._messages[0].payload == b'alicia response1'
-    assert actual_conversation._messages[1].payload == b'alicia response2'
+    assert actual_conversation.nb_sent_messages == 2
+
+    assert actual_conversation._messages[0].payload == b'alicia message1'
+    assert actual_conversation._messages[0].type() == MessageType.MESSAGE
+    assert actual_conversation._messages[1].payload == b'alicia message2'
+    assert actual_conversation._messages[1].type() == MessageType.MESSAGE
     assert actual_conversation._messages[2].payload == b'Pop'
+    assert actual_conversation._messages[2].type() == MessageType.QUERY
+    assert actual_conversation._messages[3].payload == b'bob response'
+    assert actual_conversation._messages[3].type() == MessageType.RESPONSE
 
 
 @pytest.mark.asyncio
@@ -377,3 +385,4 @@ async def test_save_conversation_with_mspsi_secret(connect_disconnect_db):
     actual_conversation = await repository.get_conversation_by_key(conversation.public_key)
 
     assert actual_conversation.query_mspsi_secret == mspsi_key
+    assert actual_conversation.query_type == QueryType.DPSI

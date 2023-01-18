@@ -1,5 +1,5 @@
 from sqlalchemy import Table, Column, Integer, LargeBinary, MetaData, ForeignKey, DateTime, Text, Boolean, String, \
-    UniqueConstraint
+    UniqueConstraint, SmallInteger
 
 # Database table definitions.
 metadata = MetaData()
@@ -62,6 +62,7 @@ message_table = Table(
     Column('timestamp', DateTime, nullable=False),
     Column("from_key", LargeBinary, index=True, nullable=False),
     Column("payload", LargeBinary, nullable=True),
+    Column("type", SmallInteger, nullable=False),
     Column("conversation_id", Integer, ForeignKey('conversation.id'), nullable=False),
 )
 

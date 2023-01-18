@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import os
 from asyncio import Event
+from logging import DEBUG
 from unittest.mock import AsyncMock
 
 import databases
@@ -11,6 +12,7 @@ import pytest
 import pytest_asyncio
 from dsnet.core import QueryType
 from dsnet.crypto import gen_key_pair
+from dsnet.logger import logger
 from dsnet.message import MessageType, Message, PublicationMessage
 from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document, MSPSIDocumentOwner
 from dsnetserver.models import metadata as metadata_server
@@ -31,6 +33,9 @@ from test.test_utils import create_tokens
 DATABASE_URL_SERVER = 'sqlite:///dsnet_server.db'
 DATABASE_URL_ALICE = 'sqlite:///dsnet_alice.db'
 DATABASE_URL_BOB = 'sqlite:///dsnet_bob.db'
+
+
+logger.setLevel(DEBUG)
 
 async def dummy_cb(_) -> None: pass
 
@@ -277,63 +282,80 @@ async def test_send_response(startup_and_shutdown_server, db_alice, db_bob):
     await task_alice
 
 
-# @pytest.mark.asyncio
-# @pytest.mark.timeout(5)
-# async def test_mspsi_query_response(startup_and_shutdown_server, connect_disconnect_db):
-#     repository = SqlalchemyRepository(database)
-#     tokens, pk = create_tokens(1)
-#     await repository.save_tokens(tokens)
-#     await repository.save_token_server_key(pk)
-#     keys_alice = gen_key_pair()
-#     keys_bob = gen_key_pair()
-#     await repository.save_peer(Peer(keys_alice.public))
-#     await repository.save_peer(Peer(keys_bob.public))
-#
-#     url = URL('http://localhost:12345')
-#
-#     api_alice = DsnetApi(
-#         url,
-#         None,
-#         repository,
-#         secret_key=keys_alice.secret,
-#         message_retriever=AddressMatchMessageRetriever(url, repository),
-#         message_sender=DirectMessageSender(url),
-#         query_type=QueryType.DPSI,
-#         index=MspsiIndex(repository, AsyncMock())
-#     )
-#     api_bob = DsnetApi(
-#         url,
-#         None,
-#         repository,
-#         secret_key=keys_bob.secret,
-#         message_retriever=AddressMatchMessageRetriever(url, repository),
-#         message_sender=DirectMessageSender(url),
-#         query_type=QueryType.DPSI,
-#         index=MspsiIndex(repository, AsyncMock())
-#     )
-#
-#     skey, cuckoo_filter = MSPSIDocumentOwner.publish((NamedEntity('doc_id', NamedEntityCategory.PERSON, 'foo'),),
-#                                                      [Document("doc_id", datetime.datetime.utcnow())], 1)
-#     await repository.save_publication_message(PublicationMessage("nym_bob", keys_bob.public, cuckoo_filter, 1))
-#     await repository.save_publication(Publication(keys_bob.secret, skey, 'nym_bob', 1))
-#
-#     async def cb_alice(message: Message):
-#         await api_alice.websocket_callback(message)
-#     async def cb_bob(message: Message):
-#         await api_bob.websocket_callback(message)
-#
-#     alice_task = api_alice.background_listening(cb_alice)
-#     bob_task = api_bob.background_listening(cb_bob)
-#
-#     await api_alice.send_query(b"foo")
-#
-#     await api_bob.close()
-#     await api_alice.close()
-#
-#     await alice_task
-#     await bob_task
-#
-#     assert len(await repository.get_conversations()) == 3
-#     alice_conversations = await repository.get_conversations_filter_by(querier=True)
-#     assert alice_conversations[0].nb_recv_messages == 1
-#     assert alice_conversations[0].last_message.type() == MessageType.RESPONSE
+@pytest.mark.asyncio
+@pytest.mark.timeout(5)
+async def test_mspsi_query_response(startup_and_shutdown_server, db_alice, db_bob):
+    repository_alice = SqlalchemyRepository(db_alice)
+    repository_bob = SqlalchemyRepository(db_bob)
+    tokens, pk = create_tokens(1)
+    await repository_alice.save_tokens(tokens)
+    await repository_alice.save_token_server_key(pk)
+    await repository_bob.save_token_server_key(pk)
+    keys_alice = gen_key_pair()
+    keys_bob = gen_key_pair()
+    await repository_bob.save_peer(Peer(keys_alice.public))
+    await repository_bob.save_peer(Peer(keys_bob.public))
+    await repository_alice.save_peer(Peer(keys_bob.public))
+    await repository_alice.save_peer(Peer(keys_alice.public))
+
+    url = URL('http://localhost:12345')
+
+    api_alice = DsnetApi(
+        url,
+        None,
+        repository_alice,
+        secret_key=keys_alice.secret,
+        message_retriever=AddressMatchMessageRetriever(url, repository_alice),
+        message_sender=DirectMessageSender(url),
+        query_type=QueryType.DPSI,
+        index=MspsiIndex(repository_alice, AsyncMock())
+    )
+    api_bob = DsnetApi(
+        url,
+        None,
+        repository_bob,
+        secret_key=keys_bob.secret,
+        message_retriever=AddressMatchMessageRetriever(url, repository_bob),
+        message_sender=DirectMessageSender(url),
+        query_type=QueryType.DPSI,
+        index=MspsiIndex(repository_bob, AsyncMock())
+    )
+
+    # Bob already published his index
+    skey, cuckoo_filter = MSPSIDocumentOwner.publish((NamedEntity('doc_id', NamedEntityCategory.PERSON, 'foo'),),
+                                                     [Document("doc_id", datetime.datetime.utcnow())], 1)
+    await repository_alice.save_publication_message(PublicationMessage("nym_bob", keys_bob.public, cuckoo_filter, 1))
+    await repository_bob.save_publication_message(PublicationMessage("nym_bob", keys_bob.public, cuckoo_filter, 1))
+    await repository_bob.save_publication(Publication(secret_key=keys_bob.secret, secret=skey, nym="nym_bob", nb_docs=1))
+
+    alice_event = asyncio.Event()
+    alice_expected_messages = 2
+
+    async def cb_alice(message: Message):
+        nonlocal alice_event
+        nonlocal alice_expected_messages
+        alice_expected_messages -= 1
+        await api_alice.websocket_callback(message)
+        if alice_expected_messages == 0:
+            alice_event.set()
+
+    async def cb_bob(message: Message):
+        if message.type() == MessageType.QUERY:
+            await api_bob.websocket_callback(message)
+
+    api_alice.background_listening(cb_alice)
+    api_bob.background_listening(cb_bob)
+
+    await api_alice.send_query(b"foo")
+
+    await alice_event.wait()
+
+    await api_bob.close()
+    await api_alice.close()
+
+    conversations_ = await repository_alice.get_conversations()
+    assert len(conversations_) == 2
+    alice_conversations = await repository_alice.get_conversations_filter_by(querier=True)
+
+    assert alice_conversations[0].nb_recv_messages == 1
+    assert alice_conversations[0].last_message.type() == MessageType.RESPONSE

@@ -4,6 +4,7 @@ from typing import Callable, Optional, Tuple
 from aiohttp import ClientSession, ClientTimeout
 import msgpack
 from dsnet.core import PigeonHole
+from dsnet.logger import logger
 from yarl import URL
 
 from dsnet.message import PigeonHoleNotification, PigeonHoleMessage
@@ -25,7 +26,9 @@ class AddressMatchMessageRetriever(MessageRetriever):
 
     async def retrieve(self, msg: PigeonHoleNotification) -> Optional[Tuple[bytes, PigeonHole]]:
         async with ClientSession() as session:
-            for ph in await self.repository.get_pigeonholes_by_adr(msg.adr_hex):
+            addrs = await self.repository.get_pigeonholes_by_adr(msg.adr_hex)
+            for ph in addrs:
+                logger.debug("Try to retrieve message matching shortened %s", ph.address.hex())
                 async with session.get(self.base_url.join(URL(f'/ph/{ph.address.hex()}'))) as http_response:
                     http_response.raise_for_status()
                     return await http_response.read(), ph

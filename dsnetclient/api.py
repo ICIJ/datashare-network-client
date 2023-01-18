@@ -84,7 +84,9 @@ class DsnetApi:
                         response.raise_for_status()
 
     async def send_response(self, public_key: bytes, response_data: bytes) -> None:
-        conversation = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key)
+        publications = await self.repository.get_publications()
+        mspsi_key = publications[0].secret if len(publications) > 0 else None
+        conversation = Conversation.create_from_recipient(secret_key=self.secret_key, other_public_key=public_key, query_type=self.query_type, query_mspsi_secret=mspsi_key)
         response = conversation.create_response(response_data)
         await self.repository.save_conversation(conversation)
         async with ClientSession() as session:
