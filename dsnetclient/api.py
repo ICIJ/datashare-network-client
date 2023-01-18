@@ -7,9 +7,9 @@ from typing import Awaitable, Callable, Tuple, List, Optional
 import databases
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from dsnet.core import Conversation, Query, QueryType
-from dsnet.crypto import gen_key_pair
+from dsnet.crypto import gen_key_pair, get_public_key
 from dsnet.logger import logger
-from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage, PigeonHoleMessage
+from dsnet.message import Message, MessageType, PigeonHoleNotification, PublicationMessage, PigeonHoleMessage, packb, unpackb
 from dsnet.mspsi import MSPSIDocumentOwner, MSPSIQuerier, Document
 from dsnet.token import generate_tokens, generate_challenges
 from sqlalchemy import create_engine
@@ -17,8 +17,6 @@ from sscred import (
     AbePublicKey,
     SignerCommitMessage,
     SignerResponseMessage,
-    packb,
-    unpackb,
 )
 from yarl import URL
 
@@ -73,8 +71,8 @@ class DsnetApi:
             raise NoTokenException()
 
         peers = await self.repository.peers()
+        mspsi_key = None if self.query_type == QueryType.CLEARTEXT else MSPSIQuerier.gen_key()
         for idx, peer in enumerate(peers):
-            mspsi_key = None if self.query_type == QueryType.CLEARTEXT else MSPSIQuerier.gen_key()
             conv = Conversation.create_from_querier(query_keys.secret, peer.public_key, query, query_mspsi_secret=mspsi_key)
             await self.repository.save_conversation(conv)
             if idx == len(peers) - 1:

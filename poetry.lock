@@ -708,8 +708,8 @@ sscred = {git = "https://github.com/ICIJ/SSCred.git", tag = "0.3.4"}
 [package.source]
 type = "git"
 url = "https://github.com/ICIJ/datashare-network-core.git"
-reference = "f76668e48985db496f3f03dfceb44ada882dd179"
-resolved_reference = "f76668e48985db496f3f03dfceb44ada882dd179"
+reference = "246cbb1e980d3e6382f3375d8521ad3915e394fc"
+resolved_reference = "246cbb1e980d3e6382f3375d8521ad3915e394fc"
 
 [[package]]
 name = "datashare-network-server"
@@ -724,7 +724,7 @@ develop = false
 [package.dependencies]
 alembic = "^1.9.0"
 databases = {version = "^0.6.2", extras = ["postgresql", "sqlite"]}
-datashare-network-core = {git = "https://github.com/ICIJ/datashare-network-core.git", rev = "f76668e48985db496f3f03dfceb44ada882dd179"}
+datashare-network-core = {git = "https://github.com/ICIJ/datashare-network-core.git", rev = "246cbb1e980d3e6382f3375d8521ad3915e394fc"}
 psycopg2 = "^2.9.5"
 redis = "^4.4.0"
 starlette = "^0.23.1"
@@ -737,8 +737,8 @@ uvicorn = []
 [package.source]
 type = "git"
 url = "https://github.com/ICIJ/datashare-network-server.git"
-reference = "9441b9859c13f516dc59a6d122a384ede5597b1e"
-resolved_reference = "9441b9859c13f516dc59a6d122a384ede5597b1e"
+reference = "3d23e7851cf89fc900cb5a70acd89fbce520952f"
+resolved_reference = "3d23e7851cf89fc900cb5a70acd89fbce520952f"
 
 [[package]]
 name = "datashare-network-tokenserver"
@@ -2263,4 +2263,4 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "dd4ae6e2afec119364ae1597798348e057597de1408bbed92c15c444435ad6d8"
+content-hash = "3da92c55e2038f61977d9b6e9626f6d690b919ccaa89b15c011dfb2823d74144"

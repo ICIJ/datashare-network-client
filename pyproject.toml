@@ -20,7 +20,7 @@ classifiers=[
 ]
 [tool.poetry.dependencies]
 python = "^3.8"
-datashare-network-core = { git = "https://github.com/ICIJ/datashare-network-core.git", rev = "f76668e48985db496f3f03dfceb44ada882dd179" }
+datashare-network-core = { git = "https://github.com/ICIJ/datashare-network-core.git", rev = "246cbb1e980d3e6382f3375d8521ad3915e394fc" }
 aiohttp = "^3.8.3"
 aioconsole = "^0.5.1"
 elasticsearch = "^7.9.1"
@@ -41,7 +41,7 @@ pytest-timeout = "^2.1.0"
 python-multipart = "^0.0.5"
 uvicorn = {extras = ["standard"], version = "^0.20.0"}
 pytest = "^7.2.0"
-datashare-network-server = {git = "https://github.com/ICIJ/datashare-network-server.git", rev = "9441b9859c13f516dc59a6d122a384ede5597b1e"}
+datashare-network-server = {git = "https://github.com/ICIJ/datashare-network-server.git", rev = "3d23e7851cf89fc900cb5a70acd89fbce520952f"}
 datashare-network-tokenserver = {git = "https://github.com/ICIJ/datashare-network-tokenserver.git", tag = "1.0.6"}
 
 [build-system]

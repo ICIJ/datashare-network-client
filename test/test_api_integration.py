@@ -10,14 +10,15 @@ import dsnet
 import dsnetserver
 import pytest
 import pytest_asyncio
+from cuckoo.filter import BCuckooFilter
 from dsnet.core import QueryType
 from dsnet.crypto import gen_key_pair
 from dsnet.logger import logger
 from dsnet.message import MessageType, Message, PublicationMessage
-from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document, MSPSIDocumentOwner
+from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document, MSPSIDocumentOwner, MSPSIQuerier
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
-from sscred import unpackb
+from sscred import unpackb, packb
 from tokenserver.test.server import UvicornTestServer
 from yarl import URL
 
@@ -34,8 +35,6 @@ DATABASE_URL_SERVER = 'sqlite:///dsnet_server.db'
 DATABASE_URL_ALICE = 'sqlite:///dsnet_alice.db'
 DATABASE_URL_BOB = 'sqlite:///dsnet_bob.db'
 
-
-logger.setLevel(DEBUG)
 
 async def dummy_cb(_) -> None: pass
 
@@ -288,13 +287,17 @@ async def test_mspsi_query_response(startup_and_shutdown_server, db_alice, db_bo
     repository_alice = SqlalchemyRepository(db_alice)
     repository_bob = SqlalchemyRepository(db_bob)
     tokens, pk = create_tokens(1)
+
     await repository_alice.save_tokens(tokens)
     await repository_alice.save_token_server_key(pk)
     await repository_bob.save_token_server_key(pk)
+
     keys_alice = gen_key_pair()
     keys_bob = gen_key_pair()
+
     await repository_bob.save_peer(Peer(keys_alice.public))
     await repository_bob.save_peer(Peer(keys_bob.public))
+
     await repository_alice.save_peer(Peer(keys_bob.public))
     await repository_alice.save_peer(Peer(keys_alice.public))
 
@@ -322,8 +325,11 @@ async def test_mspsi_query_response(startup_and_shutdown_server, db_alice, db_bo
     )
 
     # Bob already published his index
-    skey, cuckoo_filter = MSPSIDocumentOwner.publish((NamedEntity('doc_id', NamedEntityCategory.PERSON, 'foo'),),
-                                                     [Document("doc_id", datetime.datetime.utcnow())], 1)
+    skey, cuckoo_filter = MSPSIDocumentOwner.publish(
+        (NamedEntity('doc_id', NamedEntityCategory.PERSON, 'foo'),),
+        [Document("doc_id", datetime.datetime.utcnow())],
+        1
+    )
     await repository_alice.save_publication_message(PublicationMessage("nym_bob", keys_bob.public, cuckoo_filter, 1))
     await repository_bob.save_publication_message(PublicationMessage("nym_bob", keys_bob.public, cuckoo_filter, 1))
     await repository_bob.save_publication(Publication(secret_key=keys_bob.secret, secret=skey, nym="nym_bob", nb_docs=1))
@@ -339,12 +345,8 @@ async def test_mspsi_query_response(startup_and_shutdown_server, db_alice, db_bo
         if alice_expected_messages == 0:
             alice_event.set()
 
-    async def cb_bob(message: Message):
-        if message.type() == MessageType.QUERY:
-            await api_bob.websocket_callback(message)
-
     api_alice.background_listening(cb_alice)
-    api_bob.background_listening(cb_bob)
+    api_bob.background_listening()
 
     await api_alice.send_query(b"foo")
 
@@ -353,9 +355,11 @@ async def test_mspsi_query_response(startup_and_shutdown_server, db_alice, db_bo
     await api_bob.close()
     await api_alice.close()
 
-    conversations_ = await repository_alice.get_conversations()
-    assert len(conversations_) == 2
-    alice_conversations = await repository_alice.get_conversations_filter_by(querier=True)
+    conversations = await repository_alice.get_conversations()
+    assert len(conversations) == 2
+    alice_with_bob = await repository_alice.get_conversations_filter_by(other_public_key=keys_bob.public)
 
-    assert alice_conversations[0].nb_recv_messages == 1
-    assert alice_conversations[0].last_message.type() == MessageType.RESPONSE
+    assert len(alice_with_bob) == 1
+    assert alice_with_bob[0].nb_recv_messages == 1
+    assert alice_with_bob[0].last_message.type() == MessageType.RESPONSE
+    assert alice_with_bob[0].last_message.payload == b'[[0]]' # first document matches the first keyword (foo)
