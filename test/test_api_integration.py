@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import os
 from asyncio import Event
-from logging import DEBUG
 from unittest.mock import AsyncMock
 
 import databases
@@ -10,15 +9,13 @@ import dsnet
 import dsnetserver
 import pytest
 import pytest_asyncio
-from cuckoo.filter import BCuckooFilter
 from dsnet.core import QueryType
 from dsnet.crypto import gen_key_pair
-from dsnet.logger import logger
 from dsnet.message import MessageType, Message, PublicationMessage
-from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document, MSPSIDocumentOwner, MSPSIQuerier
+from dsnet.mspsi import NamedEntity, NamedEntityCategory, Document, MSPSIDocumentOwner
 from dsnetserver.models import metadata as metadata_server
 from sqlalchemy import create_engine
-from sscred import unpackb, packb
+from sscred import unpackb
 from tokenserver.test.server import UvicornTestServer
 from yarl import URL
 
@@ -29,7 +26,6 @@ from dsnetclient.message_sender import DirectMessageSender
 from dsnetclient.models import metadata as metadata_client
 from dsnetclient.repository import SqlalchemyRepository, Peer, Publication
 from test.test_utils import create_tokens
-
 
 DATABASE_URL_SERVER = 'sqlite:///dsnet_server.db'
 DATABASE_URL_ALICE = 'sqlite:///dsnet_alice.db'
