@@ -88,7 +88,8 @@ async def test_root(startup_and_shutdown_server):
         ).get_server_version() == \
            {'message': f'Datashare Network Server version {dsnetserver.__version__}',
             'core_version': dsnet.__version__,
-            'server_version': dsnetserver.__version__}
+            'server_version': dsnetserver.__version__,
+            'query_type': QueryType.CLEARTEXT}
 
 
 @pytest.mark.asyncio

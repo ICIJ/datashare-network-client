@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import datetime
 import logging
 import re
 import sys
@@ -10,10 +9,9 @@ from random import expovariate, getrandbits
 from typing import List
 
 import alembic
-from aioconsole import AsynchronousCli, ainput, compat
-from aioconsole.apython import load_readline
+from aioconsole import AsynchronousCli, ainput
+from aiohttp import ClientSession
 from dsnet.core import QueryType
-from dsnet.mspsi import Document
 
 from dsnetclient.form_parser import bs_parser
 
@@ -21,13 +19,13 @@ import click
 import databases
 import dsnet
 from dsnet.crypto import get_public_key, gen_key_pair
-from dsnet.logger import add_stdout_handler, logger
+from dsnet.logger import add_stdout_handler
 from elasticsearch import AsyncElasticsearch
 from yarl import URL
 
 from dsnetclient import __version__
 from dsnetclient.api import DsnetApi, InvalidAuthorizationResponse
-from dsnetclient.index import MemoryIndex, Index, LuceneIndex, NamedEntity, NamedEntityCategory, MspsiIndex
+from dsnetclient.index import Index, LuceneIndex, MspsiIndex
 from dsnetclient.message_retriever import AddressMatchMessageRetriever, ProbabilisticCoverMessageRetriever
 from dsnetclient.message_sender import DirectMessageSender, QueueMessageSender
 from dsnetclient.mutually_exclusive_click import MutuallyExclusiveOption
@@ -38,10 +36,9 @@ PARAM_EXTRACTOR = re.compile(r':param ([a-z_]+)')
 
 class Demo(AsynchronousCli):
     def __init__(self, server_url: URL, token_url: URL, private_key: str, repository: Repository, keys: List[str], index: Index,
-                 search_mode: QueryType, message_retriever=None, message_sender=None):
+                 query_type: QueryType, message_retriever, message_sender, loop):
         super().__init__({method.replace('do_', ''): (getattr(self, method), get_arg_parser(self, method))
-                          for method in dir(self) if method.startswith('do_')}, prog='datashare network')
-        self.search_mode = search_mode
+                          for method in dir(self) if method.startswith('do_')}, prog='datashare network', loop=loop)
         self.private_key = bytes.fromhex(private_key)
         self.public_key = get_public_key(self.private_key)
         self.repository = repository
@@ -49,9 +46,9 @@ class Demo(AsynchronousCli):
             server_url,
             token_url,
             self.repository,
-            message_retriever=AddressMatchMessageRetriever(server_url, self.repository) if message_retriever is None else message_retriever,
-            message_sender=DirectMessageSender(server_url) if message_sender is None else message_sender,
-            query_type=search_mode,
+            message_retriever=message_retriever,
+            message_sender=message_sender,
+            query_type=query_type,
             secret_key=self.private_key,
             index=index
         )
@@ -61,7 +58,7 @@ class Demo(AsynchronousCli):
         for key_hex in keys:
             key = bytes.fromhex(key_hex)
             if private_key != self.public_key:
-                asyncio.get_event_loop().run_until_complete(self.repository.save_peer(Peer(key)))
+                loop.run_until_complete(self.repository.save_peer(Peer(key)))
 
 
     async def do_version(self, _reader, _writer) -> str:
@@ -227,6 +224,12 @@ def extract_arg_from_docstring(docstring: str) -> List[str]:
     return PARAM_EXTRACTOR.findall(docstring)
 
 
+async def get_server_config(server_url: URL) -> dict:
+    async with ClientSession() as session:
+        async with session.get(server_url) as resp:
+            return await resp.json()
+
+
 @cli.command()
 @click.option('--server-url', prompt='Server url', help='The http url where the server can be joined')
 @click.option('--token-server-url', prompt='Token server url', help='The http url where the token server can be joined')
@@ -236,22 +239,15 @@ def extract_arg_from_docstring(docstring: str) -> List[str]:
 @click.option('--elasticsearch-url', cls=MutuallyExclusiveOption, help='Elasticsearch url ex: http://elasticsearch:9200',  mutually_exclusive=["entities_file"])
 @click.option('--elasticsearch-index', help='Elasticsearch index ex: local-datashare', default='local-datashare')
 @click.option('--cover/--no-cover', help='Hide real messages with a cover.', default=False)
-@click.option('--query-type', help='The query type (search mode) for the client', type=click.Choice(list(map(lambda x: x.name, QueryType))), required=False, default='CLEARTEXT', callback=lambda ctx, param, value: QueryType[value])
-def shell(server_url, token_server_url, private_key, database_url,
-          elasticsearch_url, elasticsearch_index, keys, cover, query_type: QueryType):
+def shell(server_url, token_server_url, private_key, database_url, elasticsearch_url, elasticsearch_index, keys, cover):
     with open(private_key, "r") as f:
         private_key_content = f.read()
 
     with open(keys, "r") as f:
         keys_list = f.readlines()
 
-    index = LuceneIndex(AsyncElasticsearch(elasticsearch_url), elasticsearch_index)
     repository = SqlalchemyRepository(databases.Database(database_url))
-    if query_type == QueryType.DPSI:
-        index = MspsiIndex(repository, index)
 
-    message_sender = None
-    message_retriever = None
     if cover:
         message_sender = QueueMessageSender(
             URL(server_url), lambda: expovariate(0.2)
@@ -259,6 +255,17 @@ def shell(server_url, token_server_url, private_key, database_url,
         message_retriever = ProbabilisticCoverMessageRetriever(
             URL(server_url), repository, lambda: bool(getrandbits(1))
         )
+    else:
+        message_sender = DirectMessageSender(server_url)
+        message_retriever = AddressMatchMessageRetriever(server_url, repository)
+
+    loop = asyncio.new_event_loop()
+    config = loop.run_until_complete(get_server_config(URL(server_url)))
+    query_type = QueryType(config['query_type'])
+
+    index = LuceneIndex(AsyncElasticsearch(elasticsearch_url), elasticsearch_index)
+    if query_type == QueryType.DPSI:
+        index = MspsiIndex(repository, index)
 
     demo = Demo(
         URL(server_url),
@@ -269,10 +276,9 @@ def shell(server_url, token_server_url, private_key, database_url,
         index,
         query_type,
         message_retriever=message_retriever,
-        message_sender=message_sender
+        message_sender=message_sender,
+        loop=loop
     )
-
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(demo.interact())
 
 
