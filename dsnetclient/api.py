@@ -105,6 +105,7 @@ class DsnetApi:
                               decoder: Callable[[bytes], Message] = MessageType.loads):
         callback = self.websocket_callback if notification_cb is None else notification_cb
         last_message_ts = await self.broadcast_recovery_timestamp()
+        logger.info(f'Running datashare network client with query type {self.query_type.name} (timestamp: {last_message_ts})')
         notification_url = '/notifications' if last_message_ts is None else f'/notifications?ts={last_message_ts.timestamp()}'
         url_ws = self.base_url.join(URL(notification_url))
         nb_errors = 0
